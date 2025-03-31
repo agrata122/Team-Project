@@ -2,6 +2,18 @@
     session_start(); 
 ?>
 
+<nav>
+    <?php if (isset($_SESSION['user_id'])): ?>
+        <!-- Show user profile when logged in -->
+        <a href="profile.php">My Profile</a>
+        <a href="../../Includes/logout.php">Logout</a> 
+    <?php else: ?>
+        <!-- Show login/signup buttons when not logged in -->
+        <a href="login.php">Login</a>
+        <a href="signup.php">Sign Up</a>
+    <?php endif; ?>
+</nav>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,33 +21,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FRESGRUB</title>
     <link rel="stylesheet" href="../../assets/CSS/Homepage.css">
+    <link rel="stylesheet" href="../../assets/CSS/Product-card.css">
 </head>
 <body>
     <header>
-        <div class="container">
-            <div class="logo">FRESGRUB</div>
-            <div class="search-bar">
-                <input type="text" placeholder="Search For Product or Category">
-            </div>
-            <div class="auth-buttons">
-            <button class="login" onclick="location.pathname='E-commerce/frontend/Includes/pages/login.php'">Login</button>
-            <button class="signup" onclick="location.pathname='E-commerce/frontend/Includes/pages/signup.php'">Signup</button>
-            </div>
-        </div>
+    <?php
+include '../../Includes/header.php'; 
+?>
+        
     </header>
     <section class="hero">
-        <div class="container">
-            <div class="hero-text">
-                <h1>FRESH, LOCAL, YOURS.</h1>
-                <h2>Your Neighborhood Market, <span class="highlight">Online</span></h2>
-                <p>Shop from your favorite local traders online and pick up fresh goods with ease.</p>
-                <button class="shop-now">SHOP NOW</button>
-            </div>
-            <div class="hero-image">
-                <img src="../../assets/Images/grocerypic.png" alt="Bag of fresh vegetables">
-            </div>
+    
+    <div class="container">
+        <div class="hero-text">
+            <h1>FRESH, LOCAL, YOURS.</h1>
+            <h2>Your Neighborhood Market, <span class="highlight">Online</span></h2>
+            <p>Shop from your favorite local traders online and pick up fresh goods with ease.</p>
+            <button class="shop-now">SHOP NOW</button>
         </div>
-    </section>
+        <div class="hero-image">
+            <img src="../../assets/Images/grocerypic.png" alt="Bag of fresh vegetables">
+        </div>
+    </div>
+</section>
 
     <section class="features">
     <div class="container">
@@ -68,16 +76,20 @@
 
     <section class="categories">
         <div class="category-items">
-            <div class="category">
-                <div class="image-container">
-                    <img src="../../assets/Images/butcher.png" alt="Butcher">
-                </div>
-                <div class="text-container">
-                    <h3>Butcher</h3>
-                    <p>10 items</p>
-                </div>
-            </div>
+        
+        <a href="butcher.php" class="category-link">
+    <div class="category">
+        <div class="image-container">
+            <img src="../../assets/Images/butcher.png" alt="Butcher">
+        </div>
+        <div class="text-container">
+            <h3>Butcher</h3>
+            <p>10 items</p>
+        </div>
+    </div>
+</a>
 
+        <a href="fishmonger.php" class="category-link">
             <div class="category">
                 <div class="image-container">
                     <img src="../../assets/Images/fishmonger.png" alt="Fish Monger">
@@ -87,7 +99,9 @@
                     <p>20 items</p>
                 </div>
             </div>
+</a>
 
+            <a href="greengrocer.php" class="category-link">
             <div class="category">
                 <div class="image-container">
                     <img src="../../assets/Images/greengrocer.png" alt="Greengrocer">
@@ -97,7 +111,10 @@
                     <p>15 items</p>
                 </div>
             </div>
+</a>
 
+           
+            <a href="bakery.php" class="category-link">
             <div class="category">
                 <div class="image-container">
                     <img src="../../assets/Images/bakery.png" alt="Bakery">
@@ -107,7 +124,10 @@
                     <p>20 items</p>
                 </div>
             </div>
+</a>
 
+
+            <a href="delicatessen.php" class="category-link">
             <div class="category">
                 <div class="image-container">
                     <img src="../../assets/Images/delicatessen.png" alt="Delicatessen">
@@ -119,6 +139,7 @@
             </div>
         </div>
     </section>
+</a>
     
     
     <section class="about-us">
@@ -126,11 +147,14 @@
         <div class="about-us-text">
             <h2>About Us</h2>
             <h3>Trust in our experience</h3>
-            <p>With years of dedication and passion, we have been committed to serving our customers with excellence. Our mission is to provide top-notch service,With years of dedication and passion, we have been committed to serving our customers with excellence. Our mission is to provide top-notch service, ensuring satisfaction and reliability in every interaction. We believe in quality, trust, and building long-lasting relationships with our customers. Our team is always ready to go the extra mile, striving to bring you the best experience possible.</p>
+            <p>With years of dedication and passion, we have been committed to serving our customers with excellence. Our mission is to provide top-notch service, ensuring With years of dedication and passion, we have been committed to serving our customers with excellence. Our missio satisfaction and reliability in every interaction. We believe in quality, trust, and building long-lasting relationships with our customers. Our team is always ready to go the extra mile, striving to bring you the best experience possible.</p>
             <button class="see-more">SEE MORE</button>
         </div>
-        <div class="about-us-image">
-            <img src="../../assets/Images/Home-aboutus.jpg" alt="Hands exchanging tomatoes in a bag">
+        <div class="about-us-video">
+            <video autoplay loop muted playsinline>
+                <source src="../../assets/Images/about-video.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
         </div>
     </div>
 </section>
@@ -139,11 +163,11 @@
 <section class="offer-section">
     <div class="offer-content">
         <h1>Enjoy Free Delivery</h1>
-        <p>On All Greengrocer Products</p>
+        <p>On All Fish Monger Products</p>
         <button class="shop-now-btn">SHOP NOW</button>
     </div>
     <div class="offer-image">
-        <img src="../../assets/Images/offer-image.png" alt="Fresh greengrocer products">
+        <img src="../../assets/Images/fish-offer.png" alt="Fresh greengrocer products">
     </div>
 </section>
 
@@ -186,6 +210,8 @@
         </div>
     </div>
 </section>
+
+
 
 </body>
 <?php

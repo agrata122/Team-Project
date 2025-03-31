@@ -2,12 +2,15 @@ footer {
     background-color: #f0f4f3;
     padding: 20px 0;
     font-family: Arial, sans-serif;
+    margin-top: 80px;
+    
 }
 
 .footer-container {
     display: flex;
     justify-content: space-around;
     padding: 20px;
+    margin-top: 10px;
 }
 
 .footer-column {
