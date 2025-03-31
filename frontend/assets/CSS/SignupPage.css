@@ -163,6 +163,20 @@ button {
     margin: 10px 0;
 }
 
+.form-group select {
+    width: 100%;
+    padding: 9px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    background-color: #fff;
+}
+
+#trader-fields {
+    display: none;
+    margin-top: 15px;
+}
+
 button:hover {
     background: #7cb342;
 }
