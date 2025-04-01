@@ -7,3 +7,4 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'trader') {
 
 echo "Welcome to the Trader Dashboard, "
 ?>
+ 

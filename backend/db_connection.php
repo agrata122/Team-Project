@@ -32,7 +32,8 @@ if ($db) {
             created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             status ENUM('active', 'inactive', 'pending') NOT NULL DEFAULT 'pending',
             category ENUM('butcher', 'greengrocer', 'fishmonger', 'bakery', 'delicatessen') DEFAULT NULL,
-            shop_name VARCHAR(255) DEFAULT NULL
+            first_shop_name VARCHAR(255) DEFAULT NULL,
+            second_shop_name VARCHAR(255) DEFAULT NULL
         )");
 
         echo "Created users table successfully.<br>";
@@ -41,15 +42,16 @@ if ($db) {
         $checkStmt = $db->prepare("SELECT COUNT(*) FROM users WHERE email = :email");
 
         // Prepare to insert new users
-        $insertStmt = $db->prepare("INSERT INTO users (full_name, email, contact_no, password, role, status, category, shop_name) 
-                                    VALUES (:full_name, :email, :contact_no, :password, :role, 'active', :category, :shop_name)");
+        $insertStmt = $db->prepare("INSERT INTO users (full_name, email, contact_no, password, role, status, category, first_shop_name, second_shop_name) 
+                                    VALUES (:full_name, :email, :contact_no, :password, :role, 'active', :category, :first_shop_name, :second_shop_name)");
 
         // Test users to insert (you can later modify this based on your form data)
         $users = [
-            ['full_name' => 'Admin User', 'email' => 'admin@example.com', 'contact_no' => '1234567890', 'password' => 'admin123', 'role' => 'admin', 'category' => NULL, 'shop_name' => NULL],
-            ['full_name' => 'Trader User', 'email' => 'trader@example.com', 'contact_no' => '0987654321', 'password' => 'trader123', 'role' => 'trader', 'category' => 'butcher', 'shop_name' => 'Meat Heaven'],
-            ['full_name' => 'Customer User', 'email' => 'customer@example.com', 'contact_no' => '1122334455', 'password' => 'customer123', 'role' => 'customer', 'category' => NULL, 'shop_name' => NULL],
+            ['full_name' => 'Admin User', 'email' => 'admin@example.com', 'contact_no' => '1234567890', 'password' => 'admin123', 'role' => 'admin', 'category' => NULL, 'first_shop_name' => NULL, 'second_shop_name' => NULL],
+            ['full_name' => 'Trader User', 'email' => 'trader@example.com', 'contact_no' => '0987654321', 'password' => 'trader123', 'role' => 'trader', 'category' => 'butcher', 'first_shop_name' => 'Meat Heaven', 'second_shop_name' => NULL],
+            ['full_name' => 'Customer User', 'email' => 'customer@example.com', 'contact_no' => '1122334455', 'password' => 'customer123', 'role' => 'customer', 'category' => NULL, 'first_shop_name' => NULL, 'second_shop_name' => NULL],
         ];
+        
 
         foreach ($users as $user) {
             $checkStmt->execute(['email' => $user['email']]);
@@ -61,7 +63,8 @@ if ($db) {
                     'password' => password_hash($user['password'], PASSWORD_BCRYPT),
                     'role' => $user['role'],
                     'category' => $user['category'],
-                    'shop_name' => $user['shop_name']
+                    'first_shop_name' => $user['first_shop_name'],
+                    'second_shop_name' => $user['second_shop_name']
                 ]);
                 echo "Inserted user: {$user['full_name']}<br>";
             } else {

@@ -1,7 +1,6 @@
 <?php
 session_start();
 require_once '../../../backend/db_connection.php';
- 
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
@@ -15,12 +14,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password'])) {
+            if ($user['status'] !== 'active') {
+                // If user is pending, prevent login
+                echo "Admin must approve first.";
+                exit();
+            }
+
+            // Store user session details
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['role'] = $user['role'];
 
             // Redirect based on role
             if ($user['role'] == 'admin') {
-                header("Location: admin-dashboard.php");
+                header("Location: ../../admin/admindashboard.php");
             } elseif ($user['role'] == 'trader') {
                 header("Location: trader-dashboard.php");
             } elseif ($user['role'] == 'customer') {
@@ -35,6 +41,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 ?>
+
 
 
 

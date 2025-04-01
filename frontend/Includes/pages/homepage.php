@@ -187,7 +187,7 @@ include '../../Includes/header.php';
 <!-- Product Section -->
 <section class="product-section">
     <div class="container">
-        <div class="product-container">
+        <div class="product-container"> 
             <?php
             $products = [
                 ["image" => "../../assets/Images/product-fish.png", "name" => "Healthy Fish", "price" => 7.00],

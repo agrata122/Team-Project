@@ -96,22 +96,27 @@ $email = $_POST['email'] ?? '';
                 
                 <!-- Extra fields for Traders -->
                 <div id="trader-fields" style="display: none;">
-                    <div class="form-group">
-                        <label>Category</label>
-                        <select name="category">
-                            <option value="butcher">Butcher</option>
-                            <option value="greengrocer">Greengrocer</option>
-                            <option value="fishmonger">Fishmonger</option>
-                            <option value="bakery">Bakery</option>
-                            <option value="delicatessen">Delicatessen</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Shop Name</label>
-                        <input type="text" name="shop_name" placeholder="Enter your shop name">
-                    </div>
-                </div>
+    <div class="form-group">
+        <label>Category</label>
+        <select name="category">
+            <option value="butcher">Butcher</option>
+            <option value="greengrocer">Greengrocer</option>
+            <option value="fishmonger">Fishmonger</option>
+            <option value="bakery">Bakery</option>
+            <option value="delicatessen">Delicatessen</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>First Shop Name</label>
+        <input type="text" name="first_shop_name" placeholder="Enter your First shop name">
+    </div>
+
+    <div class="form-group">
+        <label>Second Shop Name</label>
+        <input type="text" name="second_shop_name" placeholder="Enter your Second shop name">
+    </div>
+</div>
                 
                 <div class="terms-container">
                     <input type="checkbox" id="terms" name="terms" required>

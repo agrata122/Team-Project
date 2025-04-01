@@ -1,7 +1,4 @@
-<?php 
-    session_start(); 
-?>
-
+<?php session_start(); ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,80 +8,143 @@
     <link rel="stylesheet" href="../../assets/CSS/Product-card.css">
     <title>Bakery Category</title>
     <style>
-        .product-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 50px;
-            justify-content: center;
+            /* Page container */
+        .category-page-container {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
         }
-        @media (min-width: 1024px) {
-            .product-grid {
-                grid-template-columns: repeat(5, 1fr);
-            }
+        
+                /* Sidebar styling */
+        .category-sidebar {
+            width: 250px;
+            margin-right: 40px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Add spacing between category popup and new products */
+}
+        /* Main content area */
+        .category-main-content {
+            flex: 1;
         }
+        
+       /* Hero/Banner section */
+.hero-bakery {
+    position: relative;
+    width: 100%;
+    height: 450px; /* Increased height to match image */
+    background-color: #f0f0f0;
+    margin-bottom: 30px;
+    overflow: hidden;
+}
+
+.banner-bakery {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.banner-bakery img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: brightness(0.95); /* Slight adjustment to match the image */
+}
+
+.banner-bakery-text {
+    position: absolute;
+    top: 15%; /* Adjusted to match image positioning - text is higher up */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #000;
+    font-size: 32px;
+    font-weight: bold;
+    text-align: center;
+    z-index: 2;
+}
+
+/* Category header section */
+    .category-header-section {
+        margin-bottom: 30px;
+    }
+    
+    .category-header h2 {
+        font-size: 24px;
+        font-weight: bold;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Product grid */
+    .product-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 40px;
+    }
     </style>
 </head>
 <body>
-<header>
-    <?php include '../../Includes/header.php'; ?>
-</header>
+    <header>
+        <?php include '../../Includes/header.php'; ?>
+    </header>
 
-<section class="hero">
-    <!-- Banner Section -->
-    <div class="banner">
-        <div class="banner-text">Bakery Items, Delicious!</div>
-        <img src="assets/images/birthday-cake.png" alt="Birthday Cake">
-        <div class="banner-nav">
-            <button class="prev-btn">&lt;</button>
-            <button class="next-btn">&gt;</button>
-        </div>
+    <!-- Hero Banner Section -->
+<section class="hero-bakery">
+    <div class="banner-bakery">
+        <div class="banner-bakery-text">Bakery Items, Delicious!</div>
+        <img src="../../assets/Images/strawberry_cake.png" alt="Birthday Cake">
+        
     </div>
 </section>
+   
 
-<div class="page-container">
+    <div class="category-page-container">
         <!-- Sidebar with categories -->
-        <div class="sidebar">
+        <div class="category-sidebar">
             <?php include '../../Includes/category-popup.php'; ?>
 
-<!-- Butcher Category Products Section -->
-<section class="featured-header-section">
-    <div class="container">
-        <div class="featured-header">
-            <h2>Bakery Category Products</h2>
-        </div>
-        <div class="view-all-products">
-            View all products >
-        </div>
-    </div>
-</section>
-<section class="products">
-    <div class="container">
-
-    <div class="product-grid">
-    <?php
-        $products = [
-            ["name" => "Fresh Baguette", "price" => 4.49, "image" => "../../assets/Images/baguette.jpg"],
-            ["name" => "Croissants", "price" => 5.99, "image" => "../../assets/Images/croissants.jpg"],
-            ["name" => "Chocolate Cake", "price" => 15.99, "image" => "../../assets/Images/chocolate_cake.jpg"],
-            ["name" => "Blueberry Muffins", "price" => 6.99, "image" => "../../assets/Images/blueberry_muffins.jpg"],
-            ["name" => "Sourdough Bread", "price" => 7.49, "image" => "../../assets/Images/sourdough_bread.jpg"],
-            ["name" => "Danish Pastries", "price" => 8.99, "image" => "../../assets/Images/danish_pastries.jpg"],
-            ["name" => "Cinnamon Rolls", "price" => 9.99, "image" => "../../assets/Images/cinnamon_rolls.jpg"],
-            ["name" => "Glazed Donuts", "price" => 5.49, "image" => "../../assets/Images/glazed_donuts.jpg"],
-            ["name" => "Brownies", "price" => 10.49, "image" => "../../assets/Images/brownies.jpg"],
-            ["name" => "Whole Wheat Bread", "price" => 6.49, "image" => "../../assets/Images/whole_wheat_bread.jpg"]
-        ];
+        <!-- New Products Popup -->
+        <?php include '../../Includes/new_products_popup.php'; ?>
         
-        foreach ($products as $product) {
-            include '../../Includes/product-card.php';
-        }
-    ?>
-</div>
-
+        </div>
+        
+        <div class="category-main-content">
+            <!-- Bakery Category Products Section -->
+            <section class="category-header-section">
+                <div class="category-header">
+                    <h2>Bakery Category Products</h2>
+                </div>
+            </section>
+            
+            <section class="products">
+                <div class="product-grid">
+                    <?php
+                    $products = [
+                        ["name" => "Tasty Cupcake", "price" => 7.00, "image" => "../../assets/Images/product-cupcake.png"],
+                        ["name" => "Brown Bread", "price" => 9.00, "image" => "../../assets/Images/brown_bread.png"],
+                        ["name" => "Strawberry Cake", "price" => 12.00, "image" => "../../assets/Images/strawberry_cake.png"],
+                        ["name" => "Bread loaf", "price" => 3.00, "image" => "../../assets/Images/bread_loaf.png"],
+                        ["name" => "Basket Set", "price" => 14.00, "image" => "../../assets/Images/bakery.png"],
+                        ["name" => "White Bread", "price" => 7.00, "image" => "../../assets/Images/white_bread.png"],
+                        ["name" => "Chocolate Cake", "price" => 15.00, "image" => "../../assets/Images/strawberry_cake.png"],
+                        ["name" => "Croissants", "price" => 5.50, "image" => "../../assets/Images/bread_loaf.png"],
+                    ];
+                    
+                    foreach ($products as $product) {
+                        include '../../Includes/product-card.php';
+                    }
+                    ?>
+                </div>
+            </section>
+        </div>
     </div>
-</section>
+
+    <?php include '../../Includes/footer.php'; ?>
 </body>
-<?php
-include '../../Includes/footer.php';
-?>
 </html>
