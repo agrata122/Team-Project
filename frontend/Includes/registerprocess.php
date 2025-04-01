@@ -11,12 +11,15 @@ if (!$db) {
 // Step 1: Check if OTP was verified
 if (isset($_POST['otp_verified']) && $_POST['otp_verified'] === "true" && isset($_SESSION['reg_data'])) {
     $data = $_SESSION['reg_data'];
+    
+    // Set status based on user role
+    $status = ($data['role'] === 'trader') ? 'pending' : 'active';
 
     try {
         $stmt = $db->prepare("INSERT INTO users 
-            (full_name, email, contact_no, password, role, status, category, shop_name)
+            (full_name, email, contact_no, password, role, status, category, first_shop_name, second_shop_name)
             VALUES 
-            (?, ?, ?, ?, ?, 'active', ?, ?)");
+            (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         $stmt->execute([
             $data['full_name'],
@@ -24,22 +27,29 @@ if (isset($_POST['otp_verified']) && $_POST['otp_verified'] === "true" && isset(
             $data['contact_no'],
             password_hash($data['password'], PASSWORD_BCRYPT),
             $data['role'],
+            $status, // ✅ Traders = 'pending', Customers = 'active'
             $data['category'] ?? null,
-            $data['shop_name'] ?? null
+            $data['first_shop_name'] ?? null,
+            $data['second_shop_name'] ?? null
         ]);
 
-        // Step 2: Clear session and redirect to login
+        // Clear session
         unset($_SESSION['reg_data']);
         unset($_SESSION['otp_verified']);
 
-        header("Location: pages/login.php");
+        // Redirect based on status
+        if ($status === 'pending') {
+            header("Location: pages/login.php?message=Registration pending admin approval");
+        } else {
+            header("Location: pages/login.php?message=Registration successful! Please log in.");
+        }
         exit();
     } catch (PDOException $e) {
         die("Registration failed: " . $e->getMessage());
     }
-} 
+}
 
-// Step 3: Initial form submission from signup.php
+// Step 2: Handle first form submission from signup.php
 else if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $_SESSION['reg_data'] = [
         'full_name' => $_POST['fullname'],
@@ -48,10 +58,11 @@ else if ($_SERVER["REQUEST_METHOD"] == "POST") {
         'password' => $_POST['password'],
         'role' => $_POST['user-type'] ?? 'customer',
         'category' => $_POST['category'] ?? null,
-        'shop_name' => $_POST['shop_name'] ?? null
+        'first_shop_name' => $_POST['first_shop_name'] ?? null,
+        'second_shop_name' => $_POST['second_shop_name'] ?? null
     ];
 
-    // Step 4: Send OTP
+    // Step 3: Send OTP
     $_SESSION['user_email'] = $_POST['email'];
     header("Location: verify_otp.php?email=" . urlencode($_POST['email']));
     exit();

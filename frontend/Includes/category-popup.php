@@ -78,7 +78,7 @@ function renderCategoryItem($name, $icon, $count, $link) {
     padding: 16px;
     font-family: 'Arial', sans-serif;
 }
-
+ 
 .category-title {
     color: #2c3e50;
     font-size: 18px;
