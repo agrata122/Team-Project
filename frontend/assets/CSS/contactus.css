@@ -1,0 +1,192 @@
+*
+ {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  /* Centered Header Text */
+.center-container {
+    text-align: center;
+    margin: 20px;
+}
+
+
+  
+  .contact-wrapper {
+    padding: 40px 20px;
+    background: #f0f0f0;
+  }
+  
+  .contact-container {
+    display: flex;
+    max-width: 1100px;
+    margin: 0 auto;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    background: white;
+    /* Optional spacing between left and right sides */
+    /* gap: 0px; */
+  }
+  
+  /* Left Side - Contact Info */
+  .contact-info {
+    width: 450px; /* Fixed width */
+    height: 540px; /* Fixed height */
+    margin-left: 1px;
+    background: url('../../assets/Images/contactphoto.png') no-repeat center center/cover;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
+    border: 20px solid white;
+    box-sizing: border-box;
+    border-radius: 25px;
+  }
+  
+  .info-content {
+    width: 100%;
+  }
+  
+  .contact-info h3 {
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
+  
+  .contact-info p {
+    font-size: 14px;
+    margin-bottom: 30px;
+  }
+  
+  .info-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    gap: 10px;
+  }
+  
+  .info-item i {
+    font-size: 18px;
+    margin-top: 4px;
+  }
+  
+  /* Right - Form */
+  .form-container {
+    flex: 1;
+    padding: 40px 30px;
+    background: #fff;
+    margin-left: -90px; /* <-- This moves the form to the left */
+  }
+  
+  .form-group {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .half-width {
+    width: 48%;
+  }
+  
+  label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+    color: #333;
+  }
+  
+  .form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-bottom: 1px solid #ccc;
+    font-size: 15px;
+    background: transparent;
+    color: #333;
+  }
+  
+  .form-control:focus {
+    outline: none;
+    border-color: #16a34a;
+  }
+  
+  textarea.form-control {
+    min-height: 1px;
+    resize: vertical;
+  }
+  
+  .radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 10px;
+  }
+  
+  .radio-group label {
+    color: #000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  
+  .radio-group input[type="radio"] {
+    accent-color: black; /* Makes the radio circle black */
+  }
+  
+  /* Button */
+  .submit-wrapper {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+  
+  .btn-submit {
+    background: #000;
+    color: white;
+    padding: 10px 20px;
+    font-size: 15px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  
+  .btn-submit:hover {
+    background: #20ac3f;
+  }
+  
+  /* Responsive */
+  @media (max-width: 768px) {
+    .contact-container {
+      flex-direction: column;
+    }
+  
+    .contact-info {
+      width: 100%;
+      text-align: center;
+    }
+  
+    .form-group {
+      flex-direction: column;
+    }
+  
+    .half-width {
+      width: 100%;
+    }
+  
+    .submit-wrapper {
+      justify-content: center;
+    }
+  
+    .form-container {
+      margin-left: 0; /* Reset left shift for mobile */
+    }
+  }
+  

@@ -6,7 +6,6 @@ $bannerMessages = [
     "New customers get 15% off their first order with code WELCOME15."
 ];
 
-
 $currentBannerIndex = isset($_SESSION['banner_index']) ? $_SESSION['banner_index'] : 0;
 $currentBanner = $bannerMessages[$currentBannerIndex];
 
@@ -36,7 +35,7 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             box-sizing: border-box;
             font-family: 'Arial', sans-serif;
         }
-        
+
         .banner {
             background-color: #5C9D5D;
             color: white;
@@ -44,33 +43,33 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             padding: 10px 0;
             font-size: 14px;
         }
-        
+
         .main-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 15px 50px;
             border-bottom: 1px solid #eee;
+            flex-wrap: wrap;
         }
-        
+
         .logo img {
             height: 50px;
-            margin-left: 110px;
         }
-        
+
         .search-bar {
             display: flex;
             max-width: 600px;
             width: 100%;
         }
-        
+
         .search-bar input {
             flex-grow: 1;
             padding: 8px 15px;
             border: 1px solid #ccc;
             border-radius: 4px 0 0 4px;
         }
-        
+
         .search-bar button {
             background-color: #00C12B;
             color: white;
@@ -79,29 +78,29 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             border-radius: 0 4px 4px 0;
             cursor: pointer;
         }
-        
+
         .user-actions {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-        
+
         .user-profile img {
             width: 35px;
             height: 35px;
             border-radius: 50%;
             object-fit: cover;
         }
-        
+
         .notifications {
             position: relative;
         }
-        
+
         .cart {
             position: relative;
             margin-right: 70px;
         }
-        
+
         .cart-count {
             position: absolute;
             top: -10px;
@@ -116,12 +115,12 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             justify-content: center;
             font-size: 12px;
         }
-        
+
         .cart-total {
             font-size: 12px;
             color: #333;
         }
-        
+
         .navigation {
             display: flex;
             padding: 20px 50px;
@@ -129,7 +128,7 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             margin-left: 110px;
             gap: 50px;
         }
-        
+
         .nav-item {
             margin-right: 30px;
             text-decoration: none;
@@ -137,7 +136,7 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             font-weight: 500;
             position: relative;
         }
-        
+
         .nav-item.active::after {
             content: "";
             position: absolute;
@@ -147,17 +146,16 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             height: 2px;
             background-color: #00C12B;
         }
-        
+
         .nav-item:hover {
             color: #00C12B;
         }
-        
+
         .auth-buttons {
             display: flex;
             gap: 10px;
-            
         }
-        
+
         .login-btn, .signup-btn {
             padding: 8px 15px;
             border-radius: 4px;
@@ -165,29 +163,84 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             cursor: pointer;
             text-decoration: none;
         }
-        
+
         .login-btn {
             border: 1px solid #00C12B;
             color: #00C12B;
             background-color: transparent;
         }
-        
+
         .signup-btn {
             background-color: #00C12B;
             color: white;
             border: none;
         }
-        
+
         .contact-info {
             display: flex;
             align-items: center;
             margin-left: auto;
             margin-right: 70px;
         }
-        
+
         .phone {
             font-weight: 500;
             color: #333;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .main-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .logo img {
+                margin-left: 0;
+                height: 40px;
+            }
+
+            .search-bar {
+                max-width: 100%;
+            }
+
+            .navigation {
+                display: none;
+                flex-direction: column;
+                align-items: flex-start;
+                width: 100%;
+            }
+
+            .nav-item {
+                margin-right: 0;
+                margin-bottom: 10px;
+            }
+
+            .burger-menu {
+                display: block;
+                cursor: pointer;
+            }
+
+            .burger-menu div {
+                width: 25px;
+                height: 3px;
+                background-color: #333;
+                margin: 5px;
+            }
+
+            .contact-info {
+                margin-left: 0;
+                margin-right: 0;
+            }
+
+            .auth-buttons {
+                flex-direction: column;
+            }
+        }
+
+        /* Active Nav Menu */
+        .active-nav {
+            display: flex !important;
         }
     </style>
 </head>
@@ -204,7 +257,8 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
         <!-- Logo -->
         <div class="logo">
             <a href="index.php">
-                <img src="../../assets/images/logo.png" alt="FresGrub Logo">
+            <img src="../../assets/Images/logo.png" alt="FresGrub Logo">
+
             </a>
         </div>
         
@@ -249,20 +303,21 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
         </div>
     </div>
     
+    <!-- Burger Menu -->
+    <div class="burger-menu" id="burger-menu">
+        <div></div>
+        <div></div>
+        <div></div>
+    </div>
+
     <!-- Navigation Menu -->
-    <div class="navigation">
+    <div class="navigation" id="navigation">
         <a href="index.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/index.php') ? 'active' : ''; ?>">Home</a>
         <a href="shop.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/shop.php') ? 'active' : ''; ?>">Shop</a>
         <a href="about.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/about.php') ? 'active' : ''; ?>">About us</a>
-        <a href="contact.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/contact.php') ? 'active' : ''; ?>">Contact us</a>
+        <a href="contactUs.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/contactUs.php') ? 'active' : ''; ?>">Contact us</a>
         
-        <!-- Contact Info -->
-        <div class="contact-info">
-            <a href="tel:(977) 97XXXXXXX" class="phone">
-                <i class="fa-solid fa-phone"></i>
-                (977) 9842584634
-            </a>
-        </div>
+      
     </div>
 
     <!-- Banner Message Animation Script -->
@@ -292,6 +347,14 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
         
         // Rotate banner message every 5 seconds
         setInterval(rotateBannerMessage, 5000);
+
+        // Burger Menu Toggle
+        const burgerMenu = document.getElementById('burger-menu');
+        const navigation = document.getElementById('navigation');
+
+        burgerMenu.addEventListener('click', function() {
+            navigation.classList.toggle('active-nav');
+        });
     </script>
 </body>
 </html>
