@@ -1,7 +1,4 @@
-<?php 
-    session_start(); 
-?>
-
+<?php session_start(); ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,50 +6,121 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../../assets/CSS/Homepage.css">
     <link rel="stylesheet" href="../../assets/CSS/Product-card.css">
-    <title>Fishmonger Category</title>
+    <title>Butcher Category</title>
     <style>
-        .product-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 50px;
-            justify-content: center;
+            /* Page container */
+        .category-page-container {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
         }
-        @media (min-width: 1024px) {
-            .product-grid {
-                grid-template-columns: repeat(5, 1fr);
-            }
+        
+        /* Sidebar styling */
+        .category-sidebar {
+            width: 250px;
+            margin-right: 40px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Add spacing between category popup and new products */
+}
+        /* Main content area */
+        .category-main-content {
+            flex: 1;
         }
+        
+       /* Hero/Banner section */
+.hero-fishmonger {
+    position: relative;
+    width: 100%;
+    height: 450px; /* Increased height to match image */
+    background-color: #f0f0f0;
+    margin-bottom: 30px;
+    overflow: hidden;
+}
+
+.banner-fishmonger {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.banner-fishmonger img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: brightness(0.95); /* Slight adjustment to match the image */
+}
+
+.banner-fishmonger-text {
+    position: absolute;
+    top: 15%; /* Adjusted to match image positioning - text is higher up */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #000;
+    font-size: 32px;
+    font-weight: bold;
+    text-align: center;
+    z-index: 2;
+}
+
+/* Category header section */
+    .category-header-section {
+        margin-bottom: 30px;
+    }
+    
+    .category-header h2 {
+        font-size: 24px;
+        font-weight: bold;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Product grid */
+    .product-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 40px;
+    }
     </style>
 </head>
 <body>
-<header>
-    <?php include '../../Includes/header.php'; ?>
-</header>
+    <header>
+        <?php include '../../Includes/header.php'; ?>
+    </header>
 
-<section class="hero">
-    <div class="container">
-        <div class="hero-text">
-            <h1>FRESH, LOCAL, YOURS.</h1>
-            <h2>Your Neighborhood Market, <span class="highlight">Online</span></h2>
-            <p>Shop from your favorite local traders online and pick up fresh goods with ease.</p>
-        </div>
-        <div class="hero-image">
-            <img src="../../assets/Images/grocerypic.png" alt="Bag of fresh vegetables">
-        </div>
+    <!-- Hero Banner Section -->
+<section class="hero-fishmonger">
+    <div class="banner-fishmonger">
+        <div class="banner-fishmonger-text">Butcher Items, Tasty!</div>
+        <img src="/E-commerce/frontend/assets/Images/product-fish.png" alt="Birthday Cake">
+        
     </div>
 </section>
+   
 
-<!-- Butcher Category Products Section -->
-<section class="featured-header-section">
-    <div class="container">
-        <div class="featured-header">
-            <h2>Fishmonger Category Products</h2>
+    <div class="category-page-container">
+        <!-- Sidebar with categories -->
+        <div class="category-sidebar">
+            <?php include '../../Includes/category-popup.php'; ?>
+
+        <!-- New Products Popup -->
+        <?php include '../../Includes/new_products_popup.php'; ?>
+        
         </div>
-        <div class="view-all-products">
-            View all products >
-        </div>
-    </div>
-</section>
+        
+        <div class="category-main-content">
+            <!-- Bakery Category Products Section -->
+            <section class="category-header-section">
+                <div class="category-header">
+                    <h2>Butcher Category Products</h2>
+                </div>
+            </section>
 <section class="products">
     <div class="container">
 
@@ -75,12 +143,11 @@
             include '../../Includes/product-card.php';
         }
     ?>
-</div>
-
+        </section>  
     </div>
-</section>
-</body>
+</div>
 <?php
 include '../../Includes/footer.php';
 ?>
+</body>
 </html>

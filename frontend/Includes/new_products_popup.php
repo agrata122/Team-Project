@@ -1,11 +1,11 @@
 <?php
 // Simulated product data (random examples with placeholder images)
 $products = [
-    ["name" => "Mango Juice", "price" => "$99.50", "image" => "../assets/Images/mango-juice.jpg"],
-    ["name" => "Fresh Bananas", "price" => "$89.50", "image" => "../assets/Images/product-banana.png"],
-    ["name" => "Tasty Watermelon", "price" => "$25.00", "image" => "../assets/Images/watermelon.jpeg"],
-    ["name" => "Ground Pork", "price" => "$15.00", "image" => "../assets/Images/ground-pork.png"],
-    ["name" => "Fish", "price" => "$49.99", "image" => "../assets/Images/product-fish.png"]
+    ["name" => "Mango Juice", "price" => "$99.50", "image" => "/E-commerce/frontend/assets/Images/mango-juice.jpg"],
+    ["name" => "Fresh Bananas", "price" => "$89.50", "image" => "/E-commerce/frontend/assets/Images/product-banana.png"],
+    ["name" => "Tasty Watermelon", "price" => "$25.00", "image" => "/E-commerce/frontend/assets/Images/watermelon.jpeg"],
+    ["name" => "Ground Pork", "price" => "$15.00", "image" => "/E-commerce/frontend/assets/Images/ground-pork.png"],
+    ["name" => "Fish", "price" => "$49.99", "image" => "/E-commerce/frontend/assets/Images/product-fish.png"]
 ];
 ?>
 
