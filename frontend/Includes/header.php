@@ -20,13 +20,14 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FresGrub</title>
-    
+
     <link rel="stylesheet" href="assets/css/style.css">
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         /* Basic styling for the header */
@@ -36,7 +37,7 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             box-sizing: border-box;
             font-family: 'Arial', sans-serif;
         }
-        
+
         .banner {
             background-color: #5C9D5D;
             color: white;
@@ -44,7 +45,7 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             padding: 10px 0;
             font-size: 14px;
         }
-        
+
         .main-header {
             display: flex;
             justify-content: space-between;
@@ -52,25 +53,25 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             padding: 15px 50px;
             border-bottom: 1px solid #eee;
         }
-        
+
         .logo img {
             height: 50px;
             margin-left: 110px;
         }
-        
+
         .search-bar {
             display: flex;
             max-width: 600px;
             width: 100%;
         }
-        
+
         .search-bar input {
             flex-grow: 1;
             padding: 8px 15px;
             border: 1px solid #ccc;
             border-radius: 4px 0 0 4px;
         }
-        
+
         .search-bar button {
             background-color: #00C12B;
             color: white;
@@ -79,29 +80,29 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             border-radius: 0 4px 4px 0;
             cursor: pointer;
         }
-        
+
         .user-actions {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-        
+
         .user-profile img {
             width: 35px;
             height: 35px;
             border-radius: 50%;
             object-fit: cover;
         }
-        
+
         .notifications {
             position: relative;
         }
-        
+
         .cart {
             position: relative;
             margin-right: 70px;
         }
-        
+
         .cart-count {
             position: absolute;
             top: -10px;
@@ -116,12 +117,12 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             justify-content: center;
             font-size: 12px;
         }
-        
+
         .cart-total {
             font-size: 12px;
             color: #333;
         }
-        
+
         .navigation {
             display: flex;
             padding: 20px 50px;
@@ -129,7 +130,7 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             margin-left: 110px;
             gap: 50px;
         }
-        
+
         .nav-item {
             margin-right: 30px;
             text-decoration: none;
@@ -137,7 +138,7 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             font-weight: 500;
             position: relative;
         }
-        
+
         .nav-item.active::after {
             content: "";
             position: absolute;
@@ -147,50 +148,149 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             height: 2px;
             background-color: #00C12B;
         }
-        
+
         .nav-item:hover {
             color: #00C12B;
         }
-        
+
         .auth-buttons {
             display: flex;
             gap: 10px;
-            
+
         }
-        
-        .login-btn, .signup-btn {
+
+        .login-btn,
+        .signup-btn {
             padding: 8px 15px;
             border-radius: 4px;
             font-weight: 500;
             cursor: pointer;
             text-decoration: none;
         }
-        
+
         .login-btn {
             border: 1px solid #00C12B;
             color: #00C12B;
             background-color: transparent;
         }
-        
+
         .signup-btn {
             background-color: #00C12B;
             color: white;
             border: none;
         }
-        
+
         .contact-info {
             display: flex;
             align-items: center;
             margin-left: auto;
             margin-right: 70px;
         }
-        
+
         .phone {
             font-weight: 500;
             color: #333;
         }
+
+        /* RESPONSIVENESS: Header and navigation for smaller screens */
+@media (max-width: 1024px) {
+    .main-header {
+        flex-wrap: wrap;
+        padding: 15px 20px;
+    }
+
+    .logo img {
+        margin-left: 0;
+    }
+
+    .search-bar {
+        order: 3;
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .user-actions,
+    .cart {
+        margin-right: 0;
+    }
+
+    .cart {
+        margin-left: auto;
+    }
+
+    .navigation {
+        flex-wrap: wrap;
+        gap: 20px;
+        padding: 15px 20px;
+        margin-left: 0;
+    }
+
+    .nav-item {
+        margin-right: 15px;
+    }
+
+    .contact-info {
+        margin-left: 0;
+        margin-top: 10px;
+        justify-content: center;
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .search-bar {
+        margin-top: 10px;
+    }
+
+    .user-actions {
+        gap: 10px;
+    }
+
+    .navigation {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .contact-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .search-bar input {
+        font-size: 14px;
+    }
+
+    .banner {
+        font-size: 12px;
+        padding: 8px;
+    }
+
+    .cart-total {
+        display: none;
+    }
+
+    .nav-item {
+        font-size: 14px;
+    }
+
+    .login-btn,
+    .signup-btn {
+        padding: 6px 10px;
+        font-size: 14px;
+    }
+}
+
     </style>
 </head>
+
 <body>
     <!-- Top Banner -->
     <div class="banner">
@@ -198,64 +298,71 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             <p id="banner-text"><?php echo $currentBanner; ?></p>
         </div>
     </div>
-    
+
     <!-- Main Header -->
     <div class="main-header">
         <!-- Logo -->
         <div class="logo">
-            <a href="index.php">
-                <img src="../../assets/images/logo.png" alt="FresGrub Logo">
+            <a href="\E-commerce\frontend\Includes\pages\homepage.php">
+                <img src="\E-commerce\frontend\assets\Images\logo.png" alt="FresGrub Logo">
             </a>
         </div>
-        
+
         <!-- Search Bar -->
         <div class="search-bar">
             <input type="text" placeholder="Search for products or category">
             <button type="submit">Search</button>
         </div>
-        
+
         <!-- User Actions -->
         <div class="user-actions">
             <?php if ($isLoggedIn): ?>
                 <!-- User Profile -->
                 <div class="user-profile">
-                    <img src="assets/images/profile-placeholder.jpg" alt="User Profile">
+                    <a href="\E-commerce\frontend\user\user_profile.php">
+                        <i class="fas fa-user-circle fa-2x"></i> <!-- User icon -->
+                    </a>
+                    <!-- <img src="assets/images/profile-placeholder.jpg" alt="User Profile"> -->
                 </div>
-                
+
                 <!-- Notifications -->
                 <div class="notifications">
                     <a href="notifications.php">
                         <i class="fa-regular fa-bell"></i>
                     </a>
                 </div>
+                    <a href="\E-commerce\frontend\Includes\logout.php">Logout</a>
             <?php else: ?>
                 <!-- Authentication Buttons -->
-                <div class="auth-buttons">
-                    <a href="login.php" class="login-btn">Login</a>
-                    <a href="signup.php" class="signup-btn">Sign Up</a>
-                </div>
-            <?php endif; ?>
+                <!-- <?php if (isset($_SESSION['user_id'])): ?> -->
+                <!-- <?php else: ?> -->
+                <button class="login-btn" onclick="location.href='signup.php'">Sign Up</button>
+                <button class="signup-btn" onclick="location.href='login.php'">Log in</button>
+                <!-- <?php endif; ?> -->
             
-            <!-- Shopping Cart -->
-            <div class="cart">
-                <a href="cart.php">
-                    <i class="fa-solid fa-cart-shopping"></i>
-                    <span class="cart-count"><?php echo $cartCount; ?></span>
-                </a>
-                <div class="cart-total">
-                    $<?php echo number_format($cartTotal, 2); ?>
-                </div>
-            </div>
+        </div>
+    <?php endif; ?>
+
+    <!-- Shopping Cart -->
+    <div class="cart">
+        <a href="\E-commerce\frontend\Includes\cart\shopping_cart.php">
+            <i class="fa-solid fa-cart-shopping"></i>
+            <span class="cart-count"><?php echo $cartCount; ?></span>
+        </a>
+        <div class="cart-total">
+            $<?php echo number_format($cartTotal, 2); ?>
         </div>
     </div>
-    
+    </div>
+    </div>
+
     <!-- Navigation Menu -->
     <div class="navigation">
-        <a href="index.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/index.php') ? 'active' : ''; ?>">Home</a>
+        <a href="\E-commerce\frontend\Includes\pages\homepage.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/index.php') ? 'active' : ''; ?>">Home</a>
         <a href="shop.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/shop.php') ? 'active' : ''; ?>">Shop</a>
         <a href="about.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/about.php') ? 'active' : ''; ?>">About us</a>
-        <a href="contact.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/contact.php') ? 'active' : ''; ?>">Contact us</a>
-        
+        <a href="contactUs.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/contactUs.php') ? 'active' : ''; ?>">Contact us</a>
+
         <!-- Contact Info -->
         <div class="contact-info">
             <a href="tel:(977) 97XXXXXXX" class="phone">
@@ -271,27 +378,24 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
         const bannerMessages = <?php echo json_encode($bannerMessages); ?>;
         let currentIndex = 0;
         const bannerText = document.getElementById('banner-text');
-        
+
         function rotateBannerMessage() {
             currentIndex = (currentIndex + 1) % bannerMessages.length;
-            
+
             // Fade out
             bannerText.style.opacity = 0;
-            
+
             setTimeout(() => {
                 // Change text
                 bannerText.textContent = bannerMessages[currentIndex];
-                
+
                 // Fade in
                 bannerText.style.opacity = 1;
             }, 500);
         }
-        
+
         // Add CSS transition for smooth fade effect
         bannerText.style.transition = 'opacity 0.5s ease';
-        
+
         // Rotate banner message every 5 seconds
-        setInterval(rotateBannerMessage, 5000);
-    </script>
-</body>
-</html>
+        setInterval(rotateBannerMessage, 5000); </script> </body > </html>

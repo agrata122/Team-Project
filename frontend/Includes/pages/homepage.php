@@ -2,17 +2,6 @@
     session_start(); 
 ?>
 
-<nav>
-    <?php if (isset($_SESSION['user_id'])): ?>
-        <!-- Show user profile when logged in -->
-        <a href="profile.php">My Profile</a>
-        <a href="../../Includes/logout.php">Logout</a> 
-    <?php else: ?>
-        <!-- Show login/signup buttons when not logged in -->
-        <a href="login.php">Login</a>
-        <a href="signup.php">Sign Up</a>
-    <?php endif; ?>
-</nav>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -37,7 +26,7 @@ include '../../Includes/header.php';
             <h1>FRESH, LOCAL, YOURS.</h1>
             <h2>Your Neighborhood Market, <span class="highlight">Online</span></h2>
             <p>Shop from your favorite local traders online and pick up fresh goods with ease.</p>
-            <button class="shop-now">SHOP NOW</button>
+            <button class="shop-now" onclick="location.href='product_list.php'">SHOP NOW</button>
         </div>
         <div class="hero-image">
             <img src="../../assets/Images/grocerypic.png" alt="Bag of fresh vegetables">
@@ -140,6 +129,8 @@ include '../../Includes/header.php';
         </div>
     </section>
 </a>
+
+
     
     
     <section class="about-us">

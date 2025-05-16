@@ -35,7 +35,7 @@ if (isset($_GET['email']) && !empty($_GET['email'])) {
 
         $mail->send();
 
-        // Ensure correct redirection
+        // Ensuring correct redirection
         header("Location: pages/otp_verification_page.php");
         exit();
     } catch (Exception $e) {

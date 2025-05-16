@@ -27,12 +27,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // Redirect based on role
             if ($user['role'] == 'admin') {
                 header("Location: ../../admin/admindashboard.php");
-            } elseif ($user['role'] == 'trader') {
-                header("Location: trader-dashboard.php");
+                exit();
             } elseif ($user['role'] == 'customer') {
                 header("Location: homepage.php");
+                exit();
+            } elseif ($user['role'] == 'trader') {
+                // Get trader's shop category and shops
+                $shopStmt = $db->prepare("SELECT shop_type, shop_name, shop_id FROM shops WHERE user_id = :user_id LIMIT 2");
+                $shopStmt->execute(['user_id' => $user['user_id']]);
+                $shops = $shopStmt->fetchAll();
+                
+                if (count($shops) > 0) {
+                    $_SESSION['shop_type'] = $shops[0]['shop_type'];
+                    $_SESSION['shops'] = $shops;
+                    
+                    // Redirect to trader dashboard with category info
+                    header("Location: ../../trader/traderdashboard.php");
+                    exit();
+                } else {
+                    echo "Trader account has no shops assigned.";
+                    exit();
+                }
             }
-            exit();
         } else {
             echo "Invalid email or password.";
         }

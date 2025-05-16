@@ -1,7 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
-}
+} 
 
 $error = '';
 
@@ -19,7 +19,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             } elseif ($entered_otp === $_SESSION['otp']) {
                 $_SESSION['otp_verified'] = true;
 
-                // Redirect to `registerprocess.php` with verification flag
+                // Redirecting to `registerprocess.php` with verification flag
                 echo "<form id='redirect-form' action='../registerprocess.php' method='post'>";
                 echo "<input type='hidden' name='otp_verified' value='true'>";
                 echo "</form>";
