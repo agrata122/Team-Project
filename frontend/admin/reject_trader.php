@@ -1,24 +1,32 @@
 <?php
 session_start();
-require_once "../../backend/db_connection.php";
+require_once "../../backend/connect.php";
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     die("Unauthorized access.");
 }
 
-$db = getDBConnection();
-if (!$db) {
+// Initialize the connection
+$conn = getDBConnection();
+
+if (!$conn) {
     die("Database connection failed.");
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['user_id'])) {
     $user_id = $_POST['user_id'];
 
-    $stmt = $db->prepare("DELETE FROM users WHERE user_id = ?");
-    if ($stmt->execute([$user_id])) {
+    // Prepare OCI DELETE statement
+    $stmt = oci_parse($conn, "DELETE FROM users WHERE user_id = :user_id");
+    oci_bind_by_name($stmt, ":user_id", $user_id);
+
+    // Execute and check result
+    if (oci_execute($stmt)) {
         header("Location: admindashboard.php?message=Trader rejected");
+        exit();
     } else {
-        echo "Rejection failed.";
+        $e = oci_error($stmt);
+        echo "Rejection failed: " . htmlentities($e['message']);
     }
 }
 ?>

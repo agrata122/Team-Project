@@ -1,16 +1,22 @@
+<?php
+// Use $product_data instead of $product to match the new structure
+$product = $product_data;
+?>
 <div class="product-card" 
      data-name="<?php echo htmlspecialchars($product['name']); ?>" 
      data-price="<?php echo $product['price']; ?>" 
-     data-image="<?php echo $product['image']; ?>">
+     data-image="<?php echo $product['image']; ?>"
+     data-id="<?php echo $product['id']; ?>"
+     onclick="window.location.href='/E-commerce/frontend/Includes/pages/product_detail.php?product_id=<?php echo $product['id']; ?>'">
     <div class="image-container">
         <img src="<?php echo htmlspecialchars($product['image']); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>">
     </div>
     <h3><?php echo htmlspecialchars($product['name']); ?></h3>
-    <p class="price">$<?php echo number_format($product['price'], 2); ?></p>
+    <p class="price">RS. <?php echo number_format($product['price'], 2); ?></p>
     
     <div class="card-actions">
         <!-- Add to Cart Button -->
-        <button class="add-to-cart">Add to Cart</button>
+        <button class="add-to-cart" onclick="event.stopPropagation();">Add to Cart</button>
         
         <!-- Quantity Selector (Initially Hidden) -->
         <div class="quantity-container" style="display: none;">
@@ -19,7 +25,7 @@
             <button type="button" class="quantity-btn increase">▲</button>
         </div>
 
-        <span class="wishlist">&#9825;</span> 
+        <span class="wishlist" onclick="event.stopPropagation();">&#9825;</span> 
     </div>
 </div>
 
@@ -33,7 +39,8 @@ document.addEventListener("DOMContentLoaded", function () {
         const quantityInput = card.querySelector(".quantity-input");
 
         // Show quantity selector when "Add to Cart" is clicked
-        addToCartBtn.addEventListener("click", function () {
+        addToCartBtn.addEventListener("click", function (event) {
+            event.stopPropagation(); // Prevent card click
             quantityContainer.style.display = "flex"; 
             addToCartBtn.disabled = true; // Disable "Add to Cart" after clicking
         }, { once: true }); // Ensure it runs only once
@@ -48,6 +55,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         newDecreaseBtn.addEventListener("click", function (event) {
             event.preventDefault();
+            event.stopPropagation(); // Prevent card click
             let currentValue = parseInt(quantityInput.value) || 1;
             if (currentValue > 1) {
                 quantityInput.value = currentValue - 1;
@@ -56,11 +64,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
         newIncreaseBtn.addEventListener("click", function (event) {
             event.preventDefault();
+            event.stopPropagation(); // Prevent card click
             let currentValue = parseInt(quantityInput.value) || 1;
             quantityInput.value = currentValue + 1;
         });
     });
 });
-
-
 </script>

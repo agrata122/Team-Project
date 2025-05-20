@@ -1,67 +1,227 @@
 <?php
-require 'C:\xampp\htdocs\E-commerce\backend\db_connection.php';
+// Start the session at the very beginning
+session_start();
+
+require 'C:\xampp\htdocs\E-commerce\backend\connect.php';
 
 $conn = getDBConnection();
-if(!$conn) {
-    die("Database connection failed");
+if (!$conn) {
+    die("Database connection failed.");
 }
 
-// Ensure user has a unique ID
-if(isset($_COOKIE['user_id'])){
-    $user_id = $_COOKIE['user_id'];
-}else{
-    setcookie('user_id', uniqid(), time() + 60*60*24*30, "/");
-    $user_id = $_COOKIE['user_id'];
+// Check if user is logged in
+$user_id = null;
+if (isset($_SESSION['user_id'])) {
+    $user_id = $_SESSION['user_id'];
 }
+
+// Initialize message variables
+$message = "";
+$messageType = "";
 
 // Handle Add to Cart request
-if(isset($_POST['add_to_cart'])){
-   $product_id = $_POST['product_id'];
-   $qty = $_POST['qty'];
+if (isset($_POST['add_to_cart'])) {
+    $product_id = filter_var($_POST['product_id'], FILTER_SANITIZE_NUMBER_INT);
+    $qty = filter_var($_POST['qty'], FILTER_SANITIZE_NUMBER_INT);
 
-   $product_id = filter_var($product_id, FILTER_SANITIZE_NUMBER_INT);
-   $qty = filter_var($qty, FILTER_SANITIZE_NUMBER_INT);
+    if (!$product_id || !$qty) {
+        die("Invalid product ID or quantity.");
+    }
 
-   // Check if user has an existing cart
-   $check_cart = $conn->prepare("SELECT * FROM `cart` WHERE user_id = ?");
-   $check_cart->execute([$user_id]);
+    if (!isset($_SESSION['user_id'])) {
+        $message = "Please log in to add items to your cart";
+        $messageType = "error";
+    } else {
+        $user_id = $_SESSION['user_id'];
+        
+        // Check if cart exists for this user
+        $checkCartSql = "SELECT * FROM cart WHERE user_id = :user_id";
+        $checkCartStmt = oci_parse($conn, $checkCartSql);
+        oci_bind_by_name($checkCartStmt, ':user_id', $user_id, 32, SQLT_INT);
+        if (!oci_execute($checkCartStmt)) {
+            $e = oci_error($checkCartStmt);
+            die("Cart check error: " . $e['message']);
+        }
+        $cart = oci_fetch_assoc($checkCartStmt);
 
-   if($check_cart->rowCount() == 0){
-       // Create a new cart for the user
-       $insert_cart = $conn->prepare("INSERT INTO `cart` (user_id, add_date) VALUES (?, NOW())");
-       $insert_cart->execute([$user_id]);
-       $cart_id = $conn->lastInsertId();
-   } else {
-       // Get the existing cart ID
-       $cart = $check_cart->fetch(PDO::FETCH_ASSOC);
-       $cart_id = $cart['cart_id'];
-   }
+        if (!$cart) {
+            // Create new cart
+            $insertCartSql = "INSERT INTO cart (user_id, add_date) VALUES (:user_id, SYSDATE) RETURNING cart_id INTO :new_cart_id";
+            $insertCartStmt = oci_parse($conn, $insertCartSql);
+            $new_cart_id = null;
+            oci_bind_by_name($insertCartStmt, ':user_id', $user_id, 32, SQLT_INT);
+            oci_bind_by_name($insertCartStmt, ':new_cart_id', $new_cart_id, 32, SQLT_INT);
 
-   // Check if product is already in the cart
-   $check_product = $conn->prepare("SELECT * FROM `product_cart` WHERE cart_id = ? AND product_id = ?");
-   $check_product->execute([$cart_id, $product_id]);
+            if (!oci_execute($insertCartStmt)) {
+                $e = oci_error($insertCartStmt);
+                die("Cart insert error: " . $e['message']);
+            }
+            $cart_id = $new_cart_id;
+        } else {
+            $cart_id = $cart['CART_ID'];
+        }
 
-   if($check_product->rowCount() > 0){
-      $message = "Product already in cart!";
-      $messageType = "error"; // Use 'success' or 'error' to define colors
-      
-  
-   } else {
-       // Add product to product_cart table
-       $insert_product = $conn->prepare("INSERT INTO `product_cart` (cart_id, product_id, quantity) VALUES (?, ?, ?)");
-       $insert_product->execute([$cart_id, $product_id, $qty]);
+        if (!isset($cart_id) || !is_numeric($cart_id)) {
+            die("Invalid cart ID.");
+        }
 
-       // Update the stock
-       $update_stock = $conn->prepare("UPDATE `product` SET stock = stock - ? WHERE product_id = ?");
-       $update_stock->execute([$qty, $product_id]);
+        // Check if product already in cart
+        $checkProductSql = "SELECT * FROM product_cart WHERE cart_id = :cart_id AND product_id = :product_id";
+        $checkProductStmt = oci_parse($conn, $checkProductSql);
+        oci_bind_by_name($checkProductStmt, ':cart_id', $cart_id, 32, SQLT_INT);
+        oci_bind_by_name($checkProductStmt, ':product_id', $product_id, 32, SQLT_INT);
+        if (!oci_execute($checkProductStmt)) {
+            $e = oci_error($checkProductStmt);
+            die("Product check error: " . $e['message']);
+        }
 
-       $message = "Product added to cart successfully!";
-       $messageType = "success";
-       
-   }
+        if (oci_fetch($checkProductStmt)) {
+            $message = "Product already in cart!";
+            $messageType = "error";
+        } else {
+            // Insert into product_cart
+            $insertProductSql = "INSERT INTO product_cart (cart_id, product_id, quantity) VALUES (:cart_id, :product_id, :qty)";
+            $insertProductStmt = oci_parse($conn, $insertProductSql);
+            oci_bind_by_name($insertProductStmt, ':cart_id', $cart_id, 32, SQLT_INT);
+            oci_bind_by_name($insertProductStmt, ':product_id', $product_id, 32, SQLT_INT);
+            oci_bind_by_name($insertProductStmt, ':qty', $qty, 32, SQLT_INT);
+
+            if (!oci_execute($insertProductStmt)) {
+                $e = oci_error($insertProductStmt);
+                die("Insert product error: " . $e['message']);
+            }
+
+            // Update product stock
+            $updateStockSql = "UPDATE product SET stock = stock - :qty WHERE product_id = :product_id";
+            $updateStockStmt = oci_parse($conn, $updateStockSql);
+            oci_bind_by_name($updateStockStmt, ':qty', $qty, 32, SQLT_INT);
+            oci_bind_by_name($updateStockStmt, ':product_id', $product_id, 32, SQLT_INT);
+
+            if (!oci_execute($updateStockStmt)) {
+                $e = oci_error($updateStockStmt);
+                die("Stock update error: " . $e['message']);
+            }
+
+            oci_commit($conn);
+
+            $message = "Product added to cart successfully!";
+            $messageType = "success";
+        }
+
+        // Free resources
+        oci_free_statement($checkCartStmt);
+        oci_free_statement($checkProductStmt);
+        if (isset($insertCartStmt)) oci_free_statement($insertCartStmt);
+        if (isset($insertProductStmt)) oci_free_statement($insertProductStmt);
+        if (isset($updateStockStmt)) oci_free_statement($updateStockStmt);
+    }
 }
 
+// Handle Add to Wishlist request
+if (isset($_POST['add_to_wishlist'])) {
+    $product_id = filter_var($_POST['product_id'], FILTER_SANITIZE_NUMBER_INT);
 
+    if (!$product_id) {
+        die("Invalid product ID.");
+    }
+
+    if (!$user_id) {
+        $_SESSION['pending_wishlist_action'] = $product_id;
+        $message = "Please log in to add items to your wishlist";
+        $messageType = "error";
+    } else {
+        // First, check if the user already has a wishlist
+        $checkWishlistSql = "SELECT wishlist_id FROM wishlist WHERE user_id = :user_id";
+        $checkWishlistStmt = oci_parse($conn, $checkWishlistSql);
+        oci_bind_by_name($checkWishlistStmt, ':user_id', $user_id);
+        oci_execute($checkWishlistStmt);
+        $wishlist = oci_fetch_assoc($checkWishlistStmt);
+        
+        // If user doesn't have a wishlist, create one
+        if (!$wishlist) {
+            $createWishlistSql = "INSERT INTO wishlist (user_id, no_of_items) VALUES (:user_id, 0)";
+            $createWishlistStmt = oci_parse($conn, $createWishlistSql);
+            oci_bind_by_name($createWishlistStmt, ':user_id', $user_id);
+            
+            if (!oci_execute($createWishlistStmt)) {
+                $e = oci_error($createWishlistStmt);
+                die("Create wishlist error: " . $e['message']);
+            }
+            
+            // Get the newly created wishlist ID
+            $getWishlistIdSql = "SELECT wishlist_id FROM wishlist WHERE user_id = :user_id";
+            $getWishlistIdStmt = oci_parse($conn, $getWishlistIdSql);
+            oci_bind_by_name($getWishlistIdStmt, ':user_id', $user_id);
+            oci_execute($getWishlistIdStmt);
+            $wishlist = oci_fetch_assoc($getWishlistIdStmt);
+            oci_free_statement($getWishlistIdStmt);
+        }
+        
+        $wishlist_id = $wishlist['WISHLIST_ID'];
+        
+        // Check if product already in wishlist_product table
+        $checkProductSql = "SELECT * FROM wishlist_product WHERE wishlist_id = :wishlist_id AND product_id = :product_id";
+        $checkProductStmt = oci_parse($conn, $checkProductSql);
+        oci_bind_by_name($checkProductStmt, ':wishlist_id', $wishlist_id);
+        oci_bind_by_name($checkProductStmt, ':product_id', $product_id);
+        oci_execute($checkProductStmt);
+
+        if (oci_fetch($checkProductStmt)) {
+            $message = "Product already in wishlist!";
+            $messageType = "error";
+        } else {
+            // Insert into wishlist_product table
+            $insertProductSql = "INSERT INTO wishlist_product (wishlist_id, product_id, added_date) VALUES (:wishlist_id, :product_id, SYSDATE)";
+            $insertProductStmt = oci_parse($conn, $insertProductSql);
+            oci_bind_by_name($insertProductStmt, ':wishlist_id', $wishlist_id);
+            oci_bind_by_name($insertProductStmt, ':product_id', $product_id);
+
+            if (!oci_execute($insertProductStmt)) {
+                $e = oci_error($insertProductStmt);
+                die("Insert product to wishlist error: " . $e['message']);
+            }
+            
+            // Update the item count in the wishlist table
+            $updateWishlistSql = "UPDATE wishlist SET no_of_items = no_of_items + 1 WHERE wishlist_id = :wishlist_id";
+            $updateWishlistStmt = oci_parse($conn, $updateWishlistSql);
+            oci_bind_by_name($updateWishlistStmt, ':wishlist_id', $wishlist_id);
+            
+            if (!oci_execute($updateWishlistStmt)) {
+                $e = oci_error($updateWishlistStmt);
+                die("Update wishlist count error: " . $e['message']);
+            }
+            
+            oci_commit($conn);
+
+            $message = "Product added to wishlist successfully!";
+            $messageType = "success";
+        }
+
+        // Free resources
+        oci_free_statement($checkWishlistStmt);
+        oci_free_statement($checkProductStmt);
+        if (isset($createWishlistStmt)) oci_free_statement($createWishlistStmt);
+        if (isset($insertProductStmt)) oci_free_statement($insertProductStmt);
+        if (isset($updateWishlistStmt)) oci_free_statement($updateWishlistStmt);
+    }
+}
+
+// Fetch products for display
+$select_products_sql = "SELECT * FROM product";
+$select_products_stmt = oci_parse($conn, $select_products_sql);
+oci_execute($select_products_stmt);
+
+// Product count (optional)
+$product_count = 0;
+$temp_stmt = oci_parse($conn, "SELECT COUNT(*) AS total FROM product");
+oci_execute($temp_stmt);
+if ($row = oci_fetch_assoc($temp_stmt)) {
+    $product_count = $row['TOTAL'];
+}
+oci_free_statement($temp_stmt);
+
+// Close connection
+oci_close($conn);
 ?>
 
 <!DOCTYPE html>
@@ -71,198 +231,240 @@ if(isset($_POST['add_to_cart'])){
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title>View Products</title>
-   <style>
-   * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-   }
-
-   body {
-      background-color: #f5f5f5;
-      padding: 20px;
-   }
-
-   .heading {
-      text-align: center;
-      font-size: 2.5rem;
-      margin-bottom: 30px;
-      color: #333;
-   }
-
-   .products .box-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-      max-width: 1200px;
-      margin: auto;
-   }
-
-   .products .box {
-      background-color: #fff;
-      border-radius: 15px;
-      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      transition: transform 0.3s;
-   }
-
-   .products .box:hover {
-      transform: translateY(-5px);
-   }
-
-   .products .image {
-      width: 100%;
-      height: 200px;
-      object-fit: cover;
-      border-radius: 10px;
-      margin-bottom: 15px;
-   }
-
-   .products .name {
-      font-size: 1.4rem;
-      font-weight: bold;
-      margin-bottom: 10px;
-      color: #222;
-   }
-
-   .products .description {
-      font-size: 0.95rem;
-      color: #555;
-      margin-bottom: 15px;
-   }
-
-   .products .flex {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-   }
-
-   .products .price {
-      font-size: 1.2rem;
-      color: #28a745;
-      font-weight: bold;
-   }
-
-   .products .stock {
-      font-size: 0.9rem;
-      color: #999;
-   }
-
-   .products .qty {
-      width: 60px;
-      padding: 5px;
-      font-size: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      text-align: center;
-   }
-
-   .btn, .delete-btn {
-      display: inline-block;
-      padding: 10px 15px;
-      font-size: 1rem;
-      border: none;
-      border-radius: 10px;
-      text-align: center;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-      text-decoration: none;
-   }
-
-   .btn {
-      background-color: #007bff;
-      color: white;
-      margin-right: 10px;
-   }
-
-   .btn:hover {
-      background-color: #0056b3;
-   }
-
-   .delete-btn {
-      background-color: #ffc107;
-      color: #000;
-   }
-
-   .delete-btn:hover {
-      background-color: #e0a800;
-   }
-
-   .empty {
-      text-align: center;
-      color: #777;
-      font-size: 1.2rem;
-      margin-top: 50px;
-   }
-</style>
-
+   <link rel="stylesheet" href="../../assets/CSS/product_list.css">
+   
    <!-- Toastify CSS -->
    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-
-   <!-- Toastify JS -->
-   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-
 </head>
 <body>
+   <header>
+    <?php include '../../Includes/header.php'; ?>
+   </header>
 
-<section class="products">
+<?php if (!$user_id): ?>
+<div id="login-message" class="login-message">
+   You need to <a href="/E-commerce/frontend/Includes/pages/login.php">log in</a> to add items to your cart or wishlist
+</div>
+<?php endif; ?>
+
+<section class="product-section">
    <h1 class="heading">All Products</h1>
-   <div class="box-container">
+   <div class="product-container">
 
    <?php 
-      $select_products = $conn->prepare("SELECT * FROM `product`");
-      $select_products->execute();
-      if($select_products->rowCount() > 0){
-         while($fetch_product = $select_products->fetch(PDO::FETCH_ASSOC)){
+      if($product_count > 0){
+         while($fetch_product = oci_fetch_assoc($select_products_stmt)){
+            // Properly handle potential CLOB fields
+            $description = $fetch_product['DESCRIPTION'];
+            if (is_object($description) && get_class($description) === 'OCILob') {
+                $description = $description->read($description->size());
+            }
+            
+            // Handle product image
+            $product_image = $fetch_product['PRODUCT_IMAGE'];
+            if (is_object($product_image) && get_class($product_image) === 'OCILob') {
+                $product_image = $product_image->read($product_image->size());
+            }
    ?>
-   <form action="" method="POST" class="box">
-      <img src="/E-commerce/frontend/trader/uploaded_files/<?= $fetch_product['product_image']; ?>" class="image" alt="">
-      <h3 class="name"><?= $fetch_product['product_name'] ?></h3>
-      <input type="hidden" name="product_id" value="<?= $fetch_product['product_id']; ?>">
-      <p class="description"><?= $fetch_product['description'] ?></p>
-      <div class="flex">
-         <p class="price">RS. <?= $fetch_product['price'] ?></p>
-         <p class="stock">stock: <?= $fetch_product['stock'] ?></p>
-         <input type="number" name="qty" required min="1" max="<?= $fetch_product['stock'] ?>" value="1" class="qty">
-      </div>
-      <input type="submit" name="add_to_cart" value="Add to Cart" class="btn">
-      <a href="/E-commerce/frontend/Includes/cart/shopping_cart.php?get_id=<?= $fetch_product['product_id']; ?>" class="delete-btn">View Details</a>
-   </form>
+<div class="product-card" onclick="location.href='/E-commerce/frontend/includes/pages/product_detail.php?product_id=<?=$fetch_product['PRODUCT_ID'] ?>'">
+    <div class="" data-id="<?= $fetch_product['PRODUCT_ID']; ?>">
+        <div class="product-info">
+            <div class="image-container">
+                <img src="/E-commerce/frontend/trader/uploaded_files/<?= $product_image; ?>" alt="<?php echo htmlspecialchars($fetch_product['PRODUCT_NAME']); ?>">
+                <?php if($fetch_product['STOCK'] < 5): ?>
+                    <span class="badge">Low Stock</span>
+                <?php endif; ?>
+            </div>
+            <h3><?php echo htmlspecialchars($fetch_product['PRODUCT_NAME']); ?></h3>
+            <p class="price">RS. <?php echo number_format($fetch_product['PRICE'], 2); ?></p>
+            <p class="stock">Available: <?= $fetch_product['STOCK'] ?> in stock</p>
+        </div>
+    </div>
+    
+    <form action="" method="POST" class="card-actions">
+        <!-- Hidden form fields -->
+        <input type="hidden" name="product_id" value="<?= $fetch_product['PRODUCT_ID']; ?>">
+        <input type="hidden" name="qty" class="hidden-qty" value="1">
+        
+        <!-- Add to Cart Button -->
+        <button type="submit" name="add_to_cart" class="add-to-cart">Add to Cart</button>
+        
+        <!-- Quantity Selector (Initially Hidden) -->
+        <div class="quantity-container" style="display: none;">
+            <button type="button" class="quantity-btn decrease">▼</button>
+            <input type="text" class="quantity-input" value="1" readonly>
+            <button type="button" class="quantity-btn increase">▲</button>
+        </div>
+
+        <!-- Wishlist Button -->
+        <button type="submit" name="add_to_wishlist" class="wishlist-btn">
+            <span class="wishlist">&#9825;</span>
+        </button>
+    </form>
+</div>
    <?php
          }
-      }else{
+         oci_free_statement($select_products_stmt);
+      } else {
          echo '<p class="empty">No products found!</p>';
       }
    ?>
-   
    </div>
 </section>
 
-<script>
-   document.addEventListener("DOMContentLoaded", function () {
-       // Get message from PHP
-       let message = "<?= isset($message) ? $message : ''; ?>";
-       let messageType = "<?= isset($messageType) ? $messageType : ''; ?>";
+<!-- Toastify JS -->
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
-       // Check if there's a message to show
-       if (message !== "") {
-           Toastify({
-               text: message,
-               duration: 3000,
-               close: true,
-               gravity: 'top',
-               position: 'right',
-               backgroundColor: messageType === "success" ? "green" : "red",
-           }).showToast();
-       }
-   });
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // Handle clicks on the clickable area of product cards
+    document.querySelectorAll(".clickable-area").forEach(area => {
+        area.addEventListener("click", function() {
+            const productId = this.getAttribute('data-id');
+            window.location.href = `product_detail.php?id=${productId}`;
+        });
+    });
+
+    // Prevent card navigation when clicking on buttons or form elements
+    document.querySelectorAll(".card-actions, .card-actions *").forEach(element => {
+        element.addEventListener("click", function(e) {
+            e.stopPropagation();
+        });
+    });
+
+    // Get message from PHP
+    let message = "<?= isset($message) ? $message : ''; ?>";
+    let messageType = "<?= isset($messageType) ? $messageType : ''; ?>";
+    
+    // Check if there's a message to show
+    if (message !== "") {
+        Toastify({
+            text: message,
+            duration: 3000,
+            close: true,
+            gravity: 'top',
+            position: 'right',
+            backgroundColor: messageType === "success" ? "green" : "red",
+        }).showToast();
+        
+        // If it's an error about logging in, show the login message
+        if (message.includes("log in") && document.getElementById("login-message")) {
+            document.getElementById("login-message").style.display = "block";
+        }
+    }
+
+    // Handle product card interactions
+    document.querySelectorAll(".product-card").forEach((card) => {
+        const addToCartBtn = card.querySelector(".add-to-cart");
+        const quantityContainer = card.querySelector(".quantity-container");
+        const decreaseBtn = card.querySelector(".decrease");
+        const increaseBtn = card.querySelector(".increase");
+        const quantityInput = card.querySelector(".quantity-input");
+        const hiddenQtyInput = card.querySelector(".hidden-qty");
+
+        // Show quantity selector when "Add to Cart" is clicked
+        addToCartBtn.addEventListener("click", function (e) {
+            if (quantityContainer.style.display === "none") {
+                e.preventDefault();
+                quantityContainer.style.display = "flex";
+                addToCartBtn.textContent = "Confirm";
+            } else {
+                // Update the hidden quantity field before form submission
+                hiddenQtyInput.value = quantityInput.value;
+            }
+        });
+
+        // Quantity adjustment buttons
+        decreaseBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            let currentValue = parseInt(quantityInput.value) || 1;
+            if (currentValue > 1) {
+                quantityInput.value = currentValue - 1;
+            }
+        });
+
+        increaseBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            let currentValue = parseInt(quantityInput.value) || 1;
+            quantityInput.value = currentValue + 1;
+        });
+    });
+
+    // Find all wishlist buttons and attach event handlers
+    document.querySelectorAll(".wishlist-btn").forEach(button => {
+        button.addEventListener("click", function(e) {
+            e.preventDefault();
+            const form = this.closest("form");
+            const wishlistIcon = this.querySelector(".wishlist");
+            const productId = form.querySelector('input[name="product_id"]').value;
+            const productName = form.closest('.product-card').querySelector('h3').textContent;
+            
+            // Check if user is logged in
+            const isLoggedIn = <?= $user_id ? 'true' : 'false'; ?>;
+            
+            if (!isLoggedIn) {
+                Toastify({
+                    text: "Please log in to add items to your wishlist",
+                    duration: 3000,
+                    close: true,
+                    gravity: 'top',
+                    position: 'right',
+                    backgroundColor: "red",
+                }).showToast();
+                
+                document.getElementById("login-message").style.display = "block";
+                return;
+            }
+            
+            // Toggle wishlist icon immediately for better UX
+            wishlistIcon.classList.toggle('active');
+            
+            // Submit the form with wishlist action
+            const formData = new FormData(form);
+            formData.append('add_to_wishlist', '1');
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                }
+                throw new Error('Network response was not ok.');
+            })
+            .then(() => {
+                // Show success message without reloading the page
+                Toastify({
+                    text: wishlistIcon.classList.contains('active') ? 
+                          `${productName} added to wishlist!` : 
+                          `${productName} removed from wishlist!`,
+                    duration: 3000,
+                    close: true,
+                    gravity: 'top',
+                    position: 'right',
+                    backgroundColor: "green",
+                }).showToast();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Revert the icon if there was an error
+                wishlistIcon.classList.toggle('active');
+                
+                Toastify({
+                    text: "Error updating wishlist",
+                    duration: 3000,
+                    close: true,
+                    gravity: 'top',
+                    position: 'right',
+                    backgroundColor: "red",
+                }).showToast();
+            });
+        });
+    });
+});
 </script>
 
-
 </body>
+<?php include '../../Includes/footer.php'; ?>
 </html>

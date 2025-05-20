@@ -1,10 +1,10 @@
 <?php
 session_start();
-require_once '../../backend/db_connection.php';
+require_once '../../backend/connect.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header("Location: \E-commerce\frontend\Includes\pages\login.php");
+    header("Location: /E-commerce/frontend/Includes/pages/login.php");
     exit();
 }
 
@@ -14,12 +14,14 @@ $success = '';
 
 try {
     $db = getDBConnection();
-    
+
     // Fetch current user data including password
-    $stmt = $db->prepare("SELECT user_id, full_name, email, password FROM users WHERE user_id = :user_id");
-    $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
-    $stmt->execute();
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $sql = "SELECT user_id, full_name, email, password FROM users WHERE user_id = :user_id";
+    $stid = oci_parse($db, $sql);
+    oci_bind_by_name($stid, ":user_id", $user_id);
+    oci_execute($stid);
+    $user = oci_fetch_assoc($stid);
+    oci_free_statement($stid);
 
     if (!$user) {
         throw new Exception("User not found.");
@@ -32,26 +34,30 @@ try {
         $current_password = trim($_POST['current_password'] ?? '');
         $new_password = trim($_POST['new_password'] ?? '');
         $confirm_password = trim($_POST['confirm_password'] ?? '');
-        
-        // Validate required fields
+
         if (empty($full_name) || empty($email)) {
             throw new Exception("Name and email are required fields.");
         }
-        
+
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new Exception("Invalid email format.");
         }
-        
+
         // Check if email exists for another user
-        $checkEmail = $db->prepare("SELECT user_id FROM users WHERE email = :email AND user_id != :user_id");
-        $checkEmail->execute([':email' => $email, ':user_id' => $user_id]);
-        
-        if ($checkEmail->fetch()) {
+        $check_sql = "SELECT user_id FROM users WHERE email = :email AND user_id != :user_id";
+        $check_stid = oci_parse($db, $check_sql);
+        oci_bind_by_name($check_stid, ":email", $email);
+        oci_bind_by_name($check_stid, ":user_id", $user_id);
+        oci_execute($check_stid);
+
+        if (oci_fetch($check_stid)) {
+            oci_free_statement($check_stid);
             throw new Exception("This email is already registered.");
         }
+        oci_free_statement($check_stid);
 
-        // Start transaction
-        $db->beginTransaction();
+        // Start manual transaction
+        oci_execute(oci_parse($db, "BEGIN"), OCI_NO_AUTO_COMMIT);
 
         try {
             // Only verify password if trying to change it
@@ -59,50 +65,56 @@ try {
                 if (empty($current_password)) {
                     throw new Exception("Current password is required to change your password.");
                 }
-                
+
                 // Verify current password
-                if (!password_verify($current_password, $user['password'])) {
+                if (!password_verify($current_password, $user['PASSWORD'])) {
                     throw new Exception("Current password is incorrect. Please try again.");
                 }
-                
+
                 if ($new_password !== $confirm_password) {
                     throw new Exception("New passwords don't match.");
                 }
-                
+
                 if (strlen($new_password) < 8) {
                     throw new Exception("Password must be at least 8 characters long.");
                 }
-                
-                // Update password
+
+                // Hash and update password
                 $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-                $updatePassword = $db->prepare("UPDATE users SET password = :password WHERE user_id = :user_id");
-                $updatePassword->execute([':password' => $hashed_password, ':user_id' => $user_id]);
+                $update_pw_sql = "UPDATE users SET password = :password WHERE user_id = :user_id";
+                $update_pw_stid = oci_parse($db, $update_pw_sql);
+                oci_bind_by_name($update_pw_stid, ":password", $hashed_password);
+                oci_bind_by_name($update_pw_stid, ":user_id", $user_id);
+                oci_execute($update_pw_stid, OCI_NO_AUTO_COMMIT);
+                oci_free_statement($update_pw_stid);
             }
 
-            // Update profile info
-            $updateProfile = $db->prepare("UPDATE users SET full_name = :full_name, email = :email WHERE user_id = :user_id");
-            $updateProfile->execute([
-                ':full_name' => $full_name,
-                ':email' => $email,
-                ':user_id' => $user_id
-            ]);
+            // Update name and email
+            $update_sql = "UPDATE users SET full_name = :full_name, email = :email WHERE user_id = :user_id";
+            $update_stid = oci_parse($db, $update_sql);
+            oci_bind_by_name($update_stid, ":full_name", $full_name);
+            oci_bind_by_name($update_stid, ":email", $email);
+            oci_bind_by_name($update_stid, ":user_id", $user_id);
+            oci_execute($update_stid, OCI_NO_AUTO_COMMIT);
+            oci_free_statement($update_stid);
 
-            $db->commit();
+            // Commit all changes
+            oci_commit($db);
             $success = "Profile updated successfully!";
-            
+
             // Refresh user data
-            $stmt = $db->prepare("SELECT full_name, email FROM users WHERE user_id = :user_id");
-            $stmt->bindParam(':user_id', $user_id);
-            $stmt->execute();
-            $user = array_merge($user, $stmt->fetch(PDO::FETCH_ASSOC));
-            
+            $refresh_sql = "SELECT full_name, email FROM users WHERE user_id = :user_id";
+            $refresh_stid = oci_parse($db, $refresh_sql);
+            oci_bind_by_name($refresh_stid, ":user_id", $user_id);
+            oci_execute($refresh_stid);
+            $user_refresh = oci_fetch_assoc($refresh_stid);
+            oci_free_statement($refresh_stid);
+            $user = array_merge($user, $user_refresh);
         } catch (Exception $e) {
-            $db->rollBack();
+            oci_rollback($db);
             throw $e;
         }
     }
-} catch (PDOException $e) {
-    $error = "Database error occurred. Please try again.";
 } catch (Exception $e) {
     $error = $e->getMessage();
 }
@@ -115,6 +127,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Profile - FresGrub</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Footer.css">
     <style>
         :root {
             --primary: #2e7d32;
@@ -352,9 +365,11 @@ try {
     </style>
 </head>
 <body>
-<header>
+    <header>
         <?php include 'C:\xampp\htdocs\E-commerce\frontend\Includes\header.php'; ?>
     </header>
+    
+    <div class="dashboard-container">
         <!-- Main Content Area -->
         <div class="main-content">
             <div class="profile-header">
@@ -382,13 +397,13 @@ try {
                     <div class="form-group">
                         <label for="full_name">Full Name</label>
                         <input type="text" id="full_name" name="full_name" class="form-control" 
-                               value="<?php echo htmlspecialchars($user['full_name']); ?>" required>
+                               value="<?php echo htmlspecialchars($user['FULL_NAME']); ?>" required>
                     </div>
 
                     <div class="form-group">
                         <label for="email">Email</label>
                         <input type="email" id="email" name="email" class="form-control" 
-                               value="<?php echo htmlspecialchars($user['email']); ?>" required>
+                               value="<?php echo htmlspecialchars($user['EMAIL']); ?>" required>
                     </div>
 
                     <div class="section-title">
@@ -477,6 +492,6 @@ try {
             }
         });
     </script>
-    <?php include 'C:\xampp\htdocs\E-commerce\frontend\Includes\footer.php'; ?>
+    <?php include '../Includes/footer.php'; ?>
 </body>
 </html>

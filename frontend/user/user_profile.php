@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once '../../backend/db_connection.php';
+require_once '../../backend/connect.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -11,23 +11,35 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $db = getDBConnection();
 
-if ($db) {
-    $stmt = $db->prepare("SELECT full_name, email, role, created_date, status FROM users WHERE user_id = :user_id");
-    $stmt->execute(['user_id' => $user_id]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$user) {
-        echo "User not found.";
-        exit();
-    }
-} else {
+if (!$db) {
     echo "Database connection failed.";
     exit();
 }
 
+// Prepare and execute the SELECT query
+$sql = "SELECT full_name, email, role, created_date, status FROM users WHERE user_id = :user_id";
+$stid = oci_parse($db, $sql);
+oci_bind_by_name($stid, ":user_id", $user_id);
+
+if (!oci_execute($stid)) {
+    echo "Query execution failed.";
+    exit();
+}
+
+// Fix: Oracle returns column names in uppercase by default
+$user = oci_fetch_assoc($stid);
+oci_free_statement($stid);
+
+if (!$user) {
+    echo "User not found.";
+    exit();
+}
+
 // Determine the home page based on user role
-$homePage = ($user["role"] === "trader") ? "trader_dashboard.php" : "home.php";
+// Fixed to use uppercase key "ROLE"
+$homePage = ($user["ROLE"] === "trader") ? "trader_dashboard.php" : "home.php";
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -269,6 +281,7 @@ $homePage = ($user["role"] === "trader") ? "trader_dashboard.php" : "home.php";
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Footer.css">
 </head>
 <body>
     <header>
@@ -279,25 +292,25 @@ $homePage = ($user["role"] === "trader") ? "trader_dashboard.php" : "home.php";
         <!-- Main Profile Section -->
         <div class="main-profile">
             <div class="profile-avatar">
-                <?php echo substr(htmlspecialchars($user['full_name']), 0, 1); ?>
+                <?php echo substr(htmlspecialchars($user['FULL_NAME'] ?? ''), 0, 1); ?>
             </div>
-            <h1 class="profile-name"><?php echo htmlspecialchars($user['full_name']); ?></h1>
-            <div class="profile-role"><?php echo htmlspecialchars(ucfirst($user['role'])); ?></div>
+            <h1 class="profile-name"><?php echo htmlspecialchars($user['FULL_NAME'] ?? ''); ?></h1>
+            <div class="profile-role"><?php echo htmlspecialchars(ucfirst($user['ROLE'] ?? '')); ?></div>
             
             <div class="profile-details">
                 <div class="detail-row">
                     <span class="detail-label">Email Address</span>
-                    <span class="detail-value"><?php echo htmlspecialchars($user['email']); ?></span>
+                    <span class="detail-value"><?php echo htmlspecialchars($user['EMAIL'] ?? ''); ?></span>
                 </div>
                 
                 <div class="detail-row">
                     <span class="detail-label">Member Since</span>
-                    <span class="detail-value"><?php echo htmlspecialchars($user['created_date'] ?? 'N/A'); ?></span>
+                    <span class="detail-value"><?php echo htmlspecialchars($user['CREATED_DATE'] ?? 'N/A'); ?></span>
                 </div>
                 
                 <div class="detail-row">
                     <span class="detail-label">Account Status</span>
-                    <span class="detail-value"><?php echo htmlspecialchars($user['status']); ?></span>
+                    <span class="detail-value"><?php echo htmlspecialchars($user['STATUS'] ?? ''); ?></span>
                 </div>
             </div>
             
@@ -376,6 +389,6 @@ $homePage = ($user["role"] === "trader") ? "trader_dashboard.php" : "home.php";
         </div>
     </div>
     
-    <?php include 'C:\xampp\htdocs\E-commerce\frontend\Includes\footer.php'; ?>
+    <?php include '../Includes/footer.php'; ?>
 </body>
 </html>

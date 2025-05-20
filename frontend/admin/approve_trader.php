@@ -1,24 +1,30 @@
 <?php
 session_start();
-require_once "../../backend/db_connection.php";
+require_once "../../backend/connect.php";
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     die("Unauthorized access.");
 }
 
-$db = getDBConnection();
-if (!$db) {
+// Initialize DB connection
+$conn = getDBConnection();
+
+if (!$conn) {
     die("Database connection failed.");
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['user_id'])) {
     $user_id = $_POST['user_id'];
 
-    $stmt = $db->prepare("UPDATE users SET status = 'active' WHERE user_id = ?");
-    if ($stmt->execute([$user_id])) {
+    $stmt = oci_parse($conn, "UPDATE users SET status = 'active' WHERE user_id = :user_id");
+    oci_bind_by_name($stmt, ":user_id", $user_id);
+
+    if (oci_execute($stmt)) {
         header("Location: admindashboard.php?message=Trader approved");
+        exit();
     } else {
-        echo "Approval failed.";
+        $e = oci_error($stmt);
+        echo "Approval failed: " . htmlentities($e['message']);
     }
 }
 ?>

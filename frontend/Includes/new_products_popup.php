@@ -28,7 +28,7 @@ $products = [
 /* Popup container styling */
 .new-products-popup {
     background-color: #ffffff;
-    border-radius: 12px;
+    /* border-radius: 12px; */
     padding: 15px;
     max-width: 250px;
     margin: 0 auto;
