@@ -7,49 +7,149 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'trader') {
     exit();
 }
 
-// Include the database connection script
-require_once 'C:\xampp\htdocs\E-commerce\backend\db_connection.php';
+// Include the Oracle DB connection
+require_once 'C:\xampp\htdocs\E-commerce\backend\connect.php';
+
+// Get a valid Oracle connection
+$conn = getDBConnection();
+
+if (!$conn) {
+    die("❌ Failed to connect to Oracle database.");
+}
 
 // Fetch trader data from users table
 $user_id = $_SESSION['user_id'];
 $shops = $_SESSION['shops'] ?? [];
-try {
-    $query = "SELECT * FROM users WHERE user_id = :user_id AND role = 'trader'";
-    $stmt = $db->prepare($query);
-    $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
-    $stmt->execute();
-    $userData = $stmt->fetch(PDO::FETCH_ASSOC);
 
+try {
+    // Fetch user data
+    $query = "SELECT * FROM users WHERE user_id = :user_id AND role = 'trader'";
+    $stmt = oci_parse($conn, $query);
+    if (!$stmt) {
+        throw new Exception("Failed to prepare SQL statement: " . oci_error($conn)['message']);
+    }
+    
+    oci_bind_by_name($stmt, ':user_id', $user_id);
+    $result = oci_execute($stmt);
+    if (!$result) {
+        throw new Exception("Failed to execute query: " . oci_error($stmt)['message']);    
+    }
+    
+    $userData = oci_fetch_assoc($stmt);
     if (!$userData) {
         throw new Exception("Trader data not found");
     }
 
-    // COMMENTED: Orders-related queries since `orders` table doesn't exist
-    
-    $ordersQuery = "SELECT o.*, u.full_name as customer_name, u.email as customer_email 
-                    FROM orders o
-                    JOIN users u ON o.customer_id = u.user_id
-                    ORDER BY o.order_date DESC LIMIT 5";
-    $ordersStmt = $db->prepare($ordersQuery);
-    $ordersStmt->execute();
-    $recentOrders = $ordersStmt->fetchAll(PDO::FETCH_ASSOC);
+    // Fetch trader's shops if not already in session
+    if (empty($shops)) {
+        $shopsQuery = "SELECT * FROM shops WHERE trader_id = :trader_id";
+        $shopsStmt = oci_parse($conn, $shopsQuery);
+        oci_bind_by_name($shopsStmt, ':trader_id', $user_id);
+        oci_execute($shopsStmt);
+        
+        $shops = [];
+        while ($row = oci_fetch_assoc($shopsStmt)) {
+            $shops[] = $row;
+        }
+        $_SESSION['shops'] = $shops;
+    }
 
+    // Fetch recent orders (limit to 5 manually)
+    // Debugging: Let's first check the structure of the orders table
+    $tableCheckQuery = "SELECT column_name FROM all_tab_columns WHERE table_name = 'ORDERS'";
+    $tableCheckStmt = oci_parse($conn, $tableCheckQuery);
+    oci_execute($tableCheckStmt);
+    
+    $columns = [];
+    while ($row = oci_fetch_assoc($tableCheckStmt)) {
+        $columns[] = $row['COLUMN_NAME'];
+    }
+    
+    // Simplify the query to make it work with your schema
+    $ordersQuery = "SELECT o.* FROM orders o WHERE 1=1 ORDER BY o.order_date DESC";
+    $ordersStmt = oci_parse($conn, $ordersQuery);
+    if (!$ordersStmt) {
+        throw new Exception("Failed to parse orders query: " . oci_error($conn)['message']);
+    }
+    
+    $result = oci_execute($ordersStmt);
+    if (!$result) {
+        throw new Exception("Failed to execute orders query: " . oci_error($ordersStmt)['message']);
+    }
+
+    $recentOrders = [];
+    $counter = 0;
+    while (($row = oci_fetch_assoc($ordersStmt)) && $counter < 5) {
+        $recentOrders[] = $row;
+        $counter++;
+    }
+
+    // Fetch order statistics - simplified query to match your schema
     $statsQuery = "SELECT 
         COUNT(*) as total_orders,
         SUM(total_amount) as total_sales,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_orders,
-        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_orders
+        SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completed_orders,
+        SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending_orders
         FROM orders";
-    $statsStmt = $db->prepare($statsQuery);
-    $statsStmt->execute();
-    $orderStats = $statsStmt->fetch(PDO::FETCH_ASSOC);
+    $statsStmt = oci_parse($conn, $statsQuery);
+    if (!$statsStmt) {
+        throw new Exception("Failed to parse stats query: " . oci_error($conn)['message']);
+    }
     
-} catch (PDOException $e) {
-    die("Database error: " . $e->getMessage());
+    $result = oci_execute($statsStmt);
+    if (!$result) {
+        throw new Exception("Failed to execute stats query: " . oci_error($statsStmt)['message']);
+    }
+    
+    $orderStats = oci_fetch_assoc($statsStmt);
+
+    // Process order actions if submitted
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id']) && isset($_POST['action'])) {
+        $order_id = $_POST['order_id'];
+        $action = $_POST['action'];
+        $newStatus = '';
+        
+        switch($action) {
+            case 'process':
+                $newStatus = 'PROCESSING';
+                break;
+            case 'complete':
+                $newStatus = 'COMPLETED';
+                break;
+            case 'cancel':
+                $newStatus = 'CANCELLED';
+                break;
+        }
+        
+        if ($newStatus) {
+            $updateQuery = "UPDATE orders SET status = :status WHERE order_id = :order_id";
+            $updateStmt = oci_parse($conn, $updateQuery);
+            oci_bind_by_name($updateStmt, ':status', $newStatus);
+            oci_bind_by_name($updateStmt, ':order_id', $order_id);
+            
+            if (oci_execute($updateStmt)) {
+                // Refresh the page to show updated status
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
+            }
+        }
+    }
+
+    // Free resources
+    if (isset($stmt)) oci_free_statement($stmt);
+    if (isset($shopsStmt)) oci_free_statement($shopsStmt);
+    if (isset($ordersStmt)) oci_free_statement($ordersStmt);
+    if (isset($statsStmt)) oci_free_statement($statsStmt);
+    if (isset($updateStmt)) oci_free_statement($updateStmt);
+    
 } catch (Exception $e) {
-    die($e->getMessage());
+    die("Error: " . $e->getMessage());
+} finally {
+    // Close the connection
+    if ($conn) oci_close($conn);
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -396,7 +496,7 @@ try {
             <h2>Trader Dashboard</h2>
             <div class="user-info">
                 <img src="https://via.placeholder.com/40" alt="User">
-                <span>Welcome, <?php echo htmlspecialchars($userData['full_name']); ?></span>
+                <span>Welcome, <?php echo htmlspecialchars($userData['FULL_NAME']); ?></span>
             </div>
         </div>
 
@@ -406,37 +506,43 @@ try {
                 <ul class="shop-links">
                     <?php foreach ($shops as $shop): ?>
                         <li>
-                            <a href="shop.php?id=<?php echo $shop['shop_id']; ?>">
+                            <a href="shop.php?id=<?php echo $shop['SHOP_ID']; ?>">
                                 <i class="fas fa-store"></i>
-                                <?php echo htmlspecialchars($shop['shop_name']); ?>
+                                <?php echo htmlspecialchars($shop['SHOP_NAME']); ?>
                             </a>
                         </li>
                     <?php endforeach; ?>
                 </ul>
+                <a href="add_shop.php" class="btn-primary">
+                    <i class="fas fa-plus"></i> Add Shop Information
+                </a>
             <?php else: ?>
                 <p class="no-data">You have no shops listed.</p>
+                <a href="add_shop.php" class="btn-primary">
+                    <i class="fas fa-plus"></i> Create Your First Shop
+                </a>
             <?php endif; ?>
         </div>
 
         <div class="metrics">
             <div class="metric-card">
                 <h3>Total Orders</h3>
-                <div class="metric-value"><?php echo $orderStats['total_orders'] ?? 0; ?></div>
+                <div class="metric-value"><?php echo $orderStats['TOTAL_ORDERS'] ?? 0; ?></div>
             </div>
             
             <div class="metric-card">
                 <h3>Total Sales</h3>
-                <div class="metric-value">$<?php echo number_format($orderStats['total_sales'] ?? 0, 2); ?></div>
+                <div class="metric-value">$<?php echo number_format($orderStats['TOTAL_SALES'] ?? 0, 2); ?></div>
             </div>
             
             <div class="metric-card">
                 <h3>Completed Orders</h3>
-                <div class="metric-value"><?php echo $orderStats['completed_orders'] ?? 0; ?></div>
+                <div class="metric-value"><?php echo $orderStats['COMPLETED_ORDERS'] ?? 0; ?></div>
             </div>
             
             <div class="metric-card">
                 <h3>Pending Orders</h3>
-                <div class="metric-value"><?php echo $orderStats['pending_orders'] ?? 0; ?></div>
+                <div class="metric-value"><?php echo $orderStats['PENDING_ORDERS'] ?? 0; ?></div>
             </div>
         </div>
         
@@ -457,30 +563,30 @@ try {
                     <?php if (!empty($recentOrders)): ?>
                         <?php foreach ($recentOrders as $order): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($order['order_id']); ?></td>
-                                <td><?php echo htmlspecialchars($order['customer_name']); ?></td>
-                                <td><?php echo date('m/d/Y', strtotime($order['order_date'])); ?></td>
-                                <td>$<?php echo number_format($order['total_amount'], 2); ?></td>
-                                <td class="status-<?php echo htmlspecialchars($order['status']); ?>">
-                                    <?php echo ucfirst(htmlspecialchars($order['status'])); ?>
+                                <td><?php echo htmlspecialchars($order['ORDER_ID']); ?></td>
+                                <td><?php echo isset($order['CUSTOMER_NAME']) ? htmlspecialchars($order['CUSTOMER_NAME']) : 'Customer'; ?></td>
+                                <td><?php echo isset($order['ORDER_DATE']) ? date('m/d/Y', strtotime($order['ORDER_DATE'])) : '-'; ?></td>
+                                <td>$<?php echo isset($order['TOTAL_AMOUNT']) ? number_format($order['TOTAL_AMOUNT'], 2) : '0.00'; ?></td>
+                                <td class="status-<?php echo isset($order['STATUS']) ? strtolower(htmlspecialchars($order['STATUS'])) : 'pending'; ?>">
+                                    <?php echo isset($order['STATUS']) ? ucfirst(strtolower(htmlspecialchars($order['STATUS']))) : 'Pending'; ?>
                                 </td>
                                 <td>
-                                    <?php if ($order['status'] == 'pending'): ?>
+                                    <?php if (strtolower($order['STATUS']) == 'pending'): ?>
                                         <form class="action-form" method="POST">
-                                            <input type="hidden" name="order_id" value="<?php echo $order['order_id']; ?>">
+                                            <input type="hidden" name="order_id" value="<?php echo $order['ORDER_ID']; ?>">
                                             <input type="hidden" name="action" value="process">
                                             <button type="submit" class="btn btn-process">Process</button>
                                         </form>
-                                    <?php elseif ($order['status'] == 'processing'): ?>
+                                    <?php elseif (strtolower($order['STATUS']) == 'processing'): ?>
                                         <form class="action-form" method="POST">
-                                            <input type="hidden" name="order_id" value="<?php echo $order['order_id']; ?>">
+                                            <input type="hidden" name="order_id" value="<?php echo $order['ORDER_ID']; ?>">
                                             <input type="hidden" name="action" value="complete">
                                             <button type="submit" class="btn btn-complete">Complete</button>
                                         </form>
                                     <?php endif; ?>
-                                    <?php if ($order['status'] != 'completed' && $order['status'] != 'cancelled'): ?>
+                                    <?php if (strtolower($order['STATUS']) != 'completed' && strtolower($order['STATUS']) != 'cancelled'): ?>
                                         <form class="action-form" method="POST">
-                                            <input type="hidden" name="order_id" value="<?php echo $order['order_id']; ?>">
+                                            <input type="hidden" name="order_id" value="<?php echo $order['ORDER_ID']; ?>">
                                             <input type="hidden" name="action" value="cancel">
                                             <button type="submit" class="btn btn-cancel">Cancel</button>
                                         </form>

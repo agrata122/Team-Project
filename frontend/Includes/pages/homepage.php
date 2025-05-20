@@ -102,7 +102,7 @@ include '../../Includes/header.php';
             </div>
 </a>
 
-           
+            
             <a href="bakery.php" class="category-link">
             <div class="category">
                 <div class="image-container">
@@ -139,7 +139,7 @@ include '../../Includes/header.php';
             <h2>About Us</h2>
             <h3>Trust in our experience</h3>
             <p>With years of dedication and passion, we have been committed to serving our customers with excellence. Our mission is to provide top-notch service, ensuring With years of dedication and passion, we have been committed to serving our customers with excellence. Our missio satisfaction and reliability in every interaction. We believe in quality, trust, and building long-lasting relationships with our customers. Our team is always ready to go the extra mile, striving to bring you the best experience possible.</p>
-            <button class="see-more">SEE MORE</button>
+            <button class="see-more" onclick="location.href='aboutUs.php'">SEE MORE</button>
         </div>
         <div class="about-us-video">
             <video autoplay loop muted playsinline>
@@ -153,12 +153,12 @@ include '../../Includes/header.php';
 
 <section class="offer-section">
     <div class="offer-content">
-        <h1>Enjoy Free Delivery</h1>
-        <p>On All Fish Monger Products</p>
-        <button class="shop-now-btn">SHOP NOW</button>
+        <h1>Use Code 'FISH'</h1>
+        <p>And Get 10% On Your Order</p>
+        <a href="/E-commerce/frontend/Includes/pages/product_list.php" class="shop-now-btn">SHOP NOW</a>
     </div>
     <div class="offer-image">
-        <img src="../../assets/Images/fish-offer.png" alt="Fresh greengrocer products">
+        <img src="../../assets/Images/fish-offer.png" alt="Fresh Fish Products">
     </div>
 </section>
 
@@ -180,23 +180,41 @@ include '../../Includes/header.php';
     <div class="container">
         <div class="product-container"> 
             <?php
-            $products = [
-                ["image" => "../../assets/Images/product-fish.png", "name" => "Healthy Fish", "price" => 7.00],
-                ["image" => "../../assets/Images/product-sausage.png", "name" => "Chicken Sausage", "price" => 9.00],
-                ["image" => "../../assets/Images/product-banana.png", "name" => "Banana", "price" => 12.00],
-                ["image" => "../../assets/Images/product-wholechicken.png", "name" => "Whole Chicken", "price" => 14.00],
-                ["image" => "../../assets/Images/product-cupcake.png", "name" => "Vanilla Cupcake", "price" => 3.00],
-                ["image" => "../../assets/Images/delicatessen.png", "name" => "Pan Pizza", "price" => 7.00],
-                ["image" => "../../assets/Images/greengrocer.png", "name" => "Healthy Vegetables", "price" => 3.00],
-                ["image" => "../../assets/Images/product-banana.png", "name" => "Tasty Vegetables", "price" => 7.00],
-                ["image" => "../../assets/Images/product-sausage.png", "name" => "Chicken Sausage", "price" => 9.00],
-                ["image" => "../../assets/Images/delicatessen.png", "name" => "Pan Pizza", "price" => 7.00],
-               
-            ];
+            // Get database connection
+            require_once 'C:\xampp\htdocs\E-commerce\backend\connect.php';
+            $conn = getDBConnection();
 
-            foreach ($products as $product) {
+            // Query to get the most recently added products
+            $sql = "SELECT p.*, s.shop_name 
+                   FROM product p 
+                   JOIN shops s ON p.shop_id = s.shop_id 
+                   WHERE p.product_status = 'In Stock' 
+                   AND ROWNUM <= 10
+                   ORDER BY p.add_date DESC";
+            
+            $stmt = oci_parse($conn, $sql);
+            oci_execute($stmt);
+
+            while ($product = oci_fetch_assoc($stmt)) {
+                // Handle CLOB fields
+                $product_image = $product['PRODUCT_IMAGE'];
+                if (is_object($product_image) && get_class($product_image) === 'OCILob') {
+                    $product_image = $product_image->read($product_image->size());
+                }
+                
+                // Create product array for the product card
+                $product_data = [
+                    "image" => "/E-commerce/frontend/trader/uploaded_files/" . $product_image,
+                    "name" => $product['PRODUCT_NAME'],
+                    "price" => $product['PRICE'],
+                    "id" => $product['PRODUCT_ID']
+                ];
+                
                 include '../../Includes/product-card.php';
             }
+
+            oci_free_statement($stmt);
+            oci_close($conn);
             ?>
         </div>
     </div>

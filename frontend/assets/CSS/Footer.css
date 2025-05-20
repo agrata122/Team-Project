@@ -3,7 +3,6 @@ footer {
     padding: 20px 0;
     font-family: Arial, sans-serif;
     margin-top: 80px;
-    
 }
 
 .footer-container {
@@ -11,11 +10,14 @@ footer {
     justify-content: space-around;
     padding: 20px;
     margin-top: 10px;
+    flex-wrap: wrap; /* Allow columns to wrap on smaller screens */
 }
 
 .footer-column {
     flex: 1;
     margin: 0 10px;
+    min-width: 150px; /* Minimum width before wrapping */
+    margin-bottom: 20px; /* Space between rows when wrapped */
 }
 
 .footer-column h3 {
@@ -47,21 +49,64 @@ footer {
     align-items: center;
     padding: 10px 20px;
     border-top: 1px solid #ccc;
+    flex-wrap: wrap; /* Allow elements to wrap on small screens */
 }
 
 .footer-bottom p {
     margin: 0;
+    margin-bottom: 10px; /* Space when wrapped */
 }
 
-.footer-bottom .social-icons {
+.social-icons {
     display: flex;
+    gap: 25px;
 }
 
-.footer-bottom .social-icons a {
-    margin-left: 10px;
+.social-icons a {
+    color: #000;
+    font-size: 20px;
+    transition: color 0.3s;
 }
 
-.footer-bottom .social-icons img {
-    width: 24px;
-    height: 24px;
+.social-icons a:hover {
+    color: #555;
+    transform: scale(1.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .footer-container {
+        flex-direction: column; /* Stack columns vertically */
+        padding: 20px 30px; /* More side padding on mobile */
+    }
+    
+    .footer-column {
+        flex: none; /* Reset flex for stacked layout */
+        width: 100%; /* Full width columns */
+        margin-bottom: 25px; /* More space between stacked columns */
+    }
+    
+    .footer-bottom {
+        flex-direction: column; /* Stack copyright and social icons */
+        text-align: center;
+    }
+    
+    .social-icons {
+        justify-content: center;
+        margin-top: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .footer-container {
+        padding: 20px 15px;
+    }
+    
+    .footer-column h3 {
+        font-size: 1.1em;
+    }
+    
+    .social-icons {
+        gap: 15px; /* Reduce gap between icons on very small screens */
+    }
 }

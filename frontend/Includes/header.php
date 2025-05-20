@@ -81,11 +81,11 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             cursor: pointer;
         }
 
-        .user-actions {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
+       .user-actions {
+    display: flex;
+    align-items: center;
+    gap: 25px; /* Change this from 15px to 10px or even 8px */
+}   
 
         .user-profile img {
             width: 35px;
@@ -94,13 +94,28 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
             object-fit: cover;
         }
 
-        .notifications {
+        .wishlist {
             position: relative;
+        }
+
+        .wishlist-count {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background-color: #00C12B;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
         }
 
         .cart {
             position: relative;
-            margin-right: 70px;
+            margin-right: 20px;
         }
 
         .cart-count {
@@ -235,6 +250,37 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
         justify-content: center;
         width: 100%;
     }
+
+    .search-bar {
+    position: relative;
+    max-width: 600px;
+    width: 100%;
+}
+
+.search-bar input {
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.search-bar button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    padding: 0 15px;
+    background-color: #00C12B;
+    color: white;
+    border: none;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+}
+
+.search-bar button:hover {
+    background-color: #009922;
+}
 }
 
 @media (max-width: 768px) {
@@ -309,10 +355,11 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
         </div>
 
         <!-- Search Bar -->
-        <div class="search-bar">
-            <input type="text" placeholder="Search for products or category">
-            <button type="submit">Search</button>
-        </div>
+        <!-- Search Bar -->
+<form class="search-bar" action="/E-commerce/frontend/Includes/search_results.php" method="get">
+    <input type="text" name="query" placeholder="Search for products or category">
+    <button type="submit">Search</button>
+</form>
 
         <!-- User Actions -->
         <div class="user-actions">
@@ -322,45 +369,41 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
                     <a href="\E-commerce\frontend\user\user_profile.php">
                         <i class="fas fa-user-circle fa-2x"></i> <!-- User icon -->
                     </a>
-                    <!-- <img src="assets/images/profile-placeholder.jpg" alt="User Profile"> -->
                 </div>
 
-                <!-- Notifications -->
-                <div class="notifications">
-                    <a href="notifications.php">
-                        <i class="fa-regular fa-bell"></i>
+                <!-- Wishlist -->
+                <div class="wishlist">
+                    <a href="\E-commerce\frontend\Includes\pages\wishlist.php">
+                        <i class="fas fa-heart"></i>
+                        <span class="wishlist-count">0</span> <!-- You can add dynamic count here if needed -->
                     </a>
                 </div>
-                    <a href="\E-commerce\frontend\Includes\logout.php">Logout</a>
+                
+                <a href="\E-commerce\frontend\Includes\logout.php">Logout</a>
             <?php else: ?>
                 <!-- Authentication Buttons -->
-                <!-- <?php if (isset($_SESSION['user_id'])): ?> -->
-                <!-- <?php else: ?> -->
                 <button class="login-btn" onclick="location.href='signup.php'">Sign Up</button>
                 <button class="signup-btn" onclick="location.href='login.php'">Log in</button>
-                <!-- <?php endif; ?> -->
-            
+            <?php endif; ?>
         </div>
-    <?php endif; ?>
 
-    <!-- Shopping Cart -->
-    <div class="cart">
-        <a href="\E-commerce\frontend\Includes\cart\shopping_cart.php">
-            <i class="fa-solid fa-cart-shopping"></i>
-            <span class="cart-count"><?php echo $cartCount; ?></span>
-        </a>
-        <div class="cart-total">
-            $<?php echo number_format($cartTotal, 2); ?>
+        <!-- Shopping Cart -->
+        <div class="cart">
+            <a href="\E-commerce\frontend\Includes\cart\shopping_cart.php">
+                <i class="fa-solid fa-cart-shopping"></i>
+                <span class="cart-count"><?php echo $cartCount; ?></span>
+            </a>
+            <div class="cart-total">
+                $<?php echo number_format($cartTotal, 2); ?>
+            </div>
         </div>
-    </div>
-    </div>
     </div>
 
     <!-- Navigation Menu -->
     <div class="navigation">
         <a href="\E-commerce\frontend\Includes\pages\homepage.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/index.php') ? 'active' : ''; ?>">Home</a>
         <a href="shop.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/shop.php') ? 'active' : ''; ?>">Shop</a>
-        <a href="about.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/about.php') ? 'active' : ''; ?>">About us</a>
+        <a href="aboutUs.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/aboutUs.php') ? 'active' : ''; ?>">About us</a>
         <a href="contactUs.php" class="nav-item <?php echo ($_SERVER['PHP_SELF'] == '/contactUs.php') ? 'active' : ''; ?>">Contact us</a>
 
         <!-- Contact Info -->
@@ -398,4 +441,104 @@ $cartTotal = isset($_SESSION['cart_total']) ? $_SESSION['cart_total'] : 0.00;
         bannerText.style.transition = 'opacity 0.5s ease';
 
         // Rotate banner message every 5 seconds
-        setInterval(rotateBannerMessage, 5000); </script> </body > </html>
+        setInterval(rotateBannerMessage, 5000);
+
+        // Add this after your existing script in header.php
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.querySelector('.search-bar input[name="query"]');
+    const searchForm = document.querySelector('.search-bar');
+    
+    // Create suggestion dropdown
+    const suggestionDropdown = document.createElement('div');
+    suggestionDropdown.className = 'search-suggestions-dropdown';
+    suggestionDropdown.style.display = 'none';
+    suggestionDropdown.style.position = 'absolute';
+    suggestionDropdown.style.backgroundColor = 'white';
+    suggestionDropdown.style.border = '1px solid #ddd';
+    suggestionDropdown.style.width = searchInput.offsetWidth + 'px';
+    suggestionDropdown.style.maxHeight = '200px';
+    suggestionDropdown.style.overflowY = 'auto';
+    suggestionDropdown.style.zIndex = '1000';
+    
+    searchForm.appendChild(suggestionDropdown);
+    
+    // Sample categories for suggestions
+    const categories = ['butcher', 'greengrocer', 'fishmonger', 'bakery', 'delicatessen'];
+    const popularProducts = ['Bacon', 'Salmon', 'Bread', 'Apples', 'Cheese Cake'];
+    
+    searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        
+        if (query.length < 2) {
+            suggestionDropdown.style.display = 'none';
+            return;
+        }
+        
+        // Filter suggestions
+        const categoryMatches = categories.filter(cat => cat.includes(query));
+        const productMatches = popularProducts.filter(prod => prod.toLowerCase().includes(query));
+        
+        // Create suggestion HTML
+        let html = '';
+        
+        if (categoryMatches.length > 0) {
+            html += '<div class="suggestion-header">Categories</div>';
+            categoryMatches.forEach(cat => {
+                html += `<div class="suggestion-item" onclick="selectSuggestion('${cat}')">${cat}</div>`;
+            });
+        }
+        
+        if (productMatches.length > 0) {
+            html += '<div class="suggestion-header">Popular Products</div>';
+            productMatches.forEach(prod => {
+                html += `<div class="suggestion-item" onclick="selectSuggestion('${prod}')">${prod}</div>`;
+            });
+        }
+        
+        if (html) {
+            suggestionDropdown.innerHTML = html;
+            suggestionDropdown.style.display = 'block';
+        } else {
+            suggestionDropdown.style.display = 'none';
+        }
+    });
+    
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchForm.contains(e.target)) {
+            suggestionDropdown.style.display = 'none';
+        }
+    });
+    
+    // Function to select a suggestion
+    window.selectSuggestion = function(value) {
+        searchInput.value = value;
+        suggestionDropdown.style.display = 'none';
+        searchForm.submit();
+    };
+    
+    // Add styles for suggestions
+    const style = document.createElement('style');
+    style.textContent = `
+        .search-suggestions-dropdown {
+            font-family: Arial, sans-serif;
+        }
+        .suggestion-header {
+            padding: 8px 12px;
+            font-weight: bold;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        .suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        .suggestion-item:hover {
+            background-color: #f0f0f0;
+        }
+    `;
+    document.head.appendChild(style);
+});
+    </script>
+</body>
+</html>
