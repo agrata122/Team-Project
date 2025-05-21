@@ -240,7 +240,28 @@ if (isset($_POST['add_to_wishlist'])) {
 }
 
 // Fetch products by shop_id
-$select_products_sql = "SELECT * FROM product WHERE shop_id = :shop_id AND product_status = 'In Stock'";
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'default';
+$order_by = '';
+
+switch($sort) {
+    case 'price_low_high':
+        $order_by = 'ORDER BY p.price ASC';
+        break;
+    case 'price_high_low':
+        $order_by = 'ORDER BY p.price DESC';
+        break;
+    case 'rating_high_low':
+        $order_by = 'ORDER BY avg_rating DESC NULLS LAST';
+        break;
+    default:
+        $order_by = 'ORDER BY p.product_id DESC';
+}
+
+$select_products_sql = "SELECT p.*, 
+    (SELECT AVG(review_rating) FROM review r WHERE r.product_id = p.product_id) as avg_rating 
+    FROM product p 
+    WHERE p.shop_id = :shop_id AND p.product_status = 'In Stock'
+    $order_by";
 $select_products_stmt = oci_parse($conn, $select_products_sql);
 oci_bind_by_name($select_products_stmt, ':shop_id', $shop_id);
 oci_execute($select_products_stmt);
@@ -324,6 +345,48 @@ if (is_object($description) && method_exists($description, 'load')) {
        .back-button:hover {
            background-color: #1b5e20;
        }
+
+       .sort-container {
+           max-width: 1200px;
+           margin: 0 auto 20px;
+           padding: 0 20px;
+       }
+       
+       .sort-form {
+           display: flex;
+           justify-content: flex-end;
+       }
+       
+       .sort-select {
+           padding: 8px 12px;
+           border: 1px solid #ddd;
+           border-radius: 4px;
+           background-color: white;
+           font-size: 14px;
+           cursor: pointer;
+           outline: none;
+       }
+       
+       .sort-select:hover {
+           border-color: #4CAF50;
+       }
+       
+       .rating {
+           display: flex;
+           align-items: center;
+           gap: 5px;
+           margin-top: 5px;
+           color: #666;
+       }
+       
+       .rating-stars {
+           color: #ffd700;
+       }
+       
+       .no-rating {
+           color: #999;
+           font-style: italic;
+       }
    </style>
 </head>
 <body>
@@ -350,6 +413,20 @@ if (is_object($description) && method_exists($description, 'load')) {
     
     <section class="product-section">
        <h2 class="heading">Products from <?php echo htmlspecialchars($shop_name); ?></h2>
+       
+       <!-- Add sorting dropdown -->
+       <div class="sort-container">
+           <form method="GET" class="sort-form">
+               <input type="hidden" name="shop_id" value="<?php echo $shop_id; ?>">
+               <select name="sort" onchange="this.form.submit()" class="sort-select">
+                   <option value="default" <?= $sort === 'default' ? 'selected' : '' ?>>Sort by: Default</option>
+                   <option value="price_low_high" <?= $sort === 'price_low_high' ? 'selected' : '' ?>>Price: Low to High</option>
+                   <option value="price_high_low" <?= $sort === 'price_high_low' ? 'selected' : '' ?>>Price: High to Low</option>
+                   <option value="rating_high_low" <?= $sort === 'rating_high_low' ? 'selected' : '' ?>>Rating: High to Low</option>
+               </select>
+           </form>
+       </div>
+       
        <div class="product-container">
 
        <?php 
@@ -377,8 +454,23 @@ if (is_object($description) && method_exists($description, 'load')) {
                     <?php endif; ?>
                 </div>
                 <h3><?php echo htmlspecialchars($fetch_product['PRODUCT_NAME']); ?></h3>
-                <p class="price">RS. <?php echo number_format($fetch_product['PRICE'], 2); ?></p>
+                <p class="price">£<?php echo number_format($fetch_product['PRICE'], 2); ?></p>
                 <p class="stock">Available: <?= $fetch_product['STOCK'] ?> in stock</p>
+                <div class="rating">
+                    <?php if ($fetch_product['AVG_RATING']): ?>
+                        <span class="rating-stars">
+                            <?php
+                            $rating = round($fetch_product['AVG_RATING']);
+                            for ($i = 1; $i <= 5; $i++) {
+                                echo $i <= $rating ? '★' : '☆';
+                            }
+                            ?>
+                        </span>
+                        <span>(<?= number_format($fetch_product['AVG_RATING'], 1) ?>)</span>
+                    <?php else: ?>
+                        <span class="no-rating">No ratings yet</span>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
         

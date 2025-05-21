@@ -114,35 +114,9 @@ if ($conn) {
         END;
     ");
 
-    // GUEST CART TABLE
-    executeQuery($conn, "
-        CREATE TABLE guest_cart (
-            cart_id NUMBER PRIMARY KEY,
-            guest_id VARCHAR2(100) NOT NULL,
-            add_date DATE
-        )
-    ");
-    executeQuery($conn, "CREATE SEQUENCE guest_cart_seq START WITH 1 INCREMENT BY 1");
-    executeQuery($conn, "
-        CREATE OR REPLACE TRIGGER trg_guest_cart_pk
-        BEFORE INSERT ON guest_cart
-        FOR EACH ROW
-        BEGIN
-            SELECT guest_cart_seq.NEXTVAL INTO :new.cart_id FROM dual;
-        END;
-    ");
+    
 
-    // GUEST PRODUCT CART TABLE
-    executeQuery($conn, "
-        CREATE TABLE guest_product_cart (
-            cart_id NUMBER,
-            product_id NUMBER,
-            quantity NUMBER NOT NULL,
-            CONSTRAINT pk_guest_product_cart PRIMARY KEY (cart_id, product_id),
-            CONSTRAINT fk_gpc_cart FOREIGN KEY (cart_id) REFERENCES guest_cart(cart_id),
-            CONSTRAINT fk_gpc_product FOREIGN KEY (product_id) REFERENCES product(product_id)
-        )
-    ");
+    
 
     // SHOPS TABLE
     executeQuery($conn, "
@@ -182,6 +156,7 @@ if ($conn) {
             product_image VARCHAR2(100),
             add_date DATE,
             product_status VARCHAR2(20),
+            rfid VARCHAR2(10) UNIQUE,
             shop_id NUMBER NOT NULL,
             product_category_name VARCHAR2(20) NOT NULL,
             CONSTRAINT fk_product_shop FOREIGN KEY (shop_id) REFERENCES shops(shop_id)
@@ -604,11 +579,11 @@ $products = [
 foreach ($products as $p) {
     $insert_sql = "INSERT INTO product (
         product_id, product_name, description, price, stock, min_order, max_order,
-        allergy_information, product_image, add_date, product_status, shop_id, product_category_name
+        allergy_information, product_image, add_date, product_status, rfid, shop_id, product_category_name
     ) VALUES (
         :product_id, :product_name, :description, :price, :stock, :min_order, :max_order,
         :allergy_information, :product_image, TO_DATE(:add_date, 'YYYY-MM-DD'),
-        :product_status, :shop_id, :product_category_name
+        :product_status, :rfid, :shop_id, :product_category_name
     )";
 
     $stmt = oci_parse($conn, $insert_sql);
@@ -624,6 +599,8 @@ foreach ($products as $p) {
     oci_bind_by_name($stmt, ":product_image", $p[8]);
     oci_bind_by_name($stmt, ":add_date", $p[9]);
     oci_bind_by_name($stmt, ":product_status", $p[10]);
+    $rfid = ''; // Empty string for RFID
+    oci_bind_by_name($stmt, ":rfid", $rfid);
     oci_bind_by_name($stmt, ":shop_id", $p[11]);
     oci_bind_by_name($stmt, ":product_category_name", $p[12]);
 
@@ -716,7 +693,11 @@ $collectionSlots = [
     ['slot_date' => '2024-06-15', 'slot_day' => 'Wednesday', 'slot_time' => '12:00:00', 'total_order' => 20],
     ['slot_date' => '2024-06-16', 'slot_day' => 'Friday', 'slot_time' => '11:00:00', 'total_order' => 15],
     ['slot_date' => '2024-06-17', 'slot_day' => 'Wednesday', 'slot_time' => '14:00:00', 'total_order' => 18],
-    ['slot_date' => '2024-06-18', 'slot_day' => 'Thursday', 'slot_time' => '15:00:00', 'total_order' => 15]
+    ['slot_date' => '2025-05-21', 'slot_day' => 'Wednesday', 'slot_time' => '15:00:00', 'total_order' => 15],
+    ['slot_date' => '2025-05-22', 'slot_day' => 'Thursday', 'slot_time' => '15:00:00', 'total_order' => 15],
+    ['slot_date' => '2025-05-23', 'slot_day' => 'Friday', 'slot_time' => '15:00:00', 'total_order' => 15],
+    ['slot_date' => '2025-05-28', 'slot_day' => 'Wednesday', 'slot_time' => '15:00:00', 'total_order' => 15],
+    ['slot_date' => '2025-05-29', 'slot_day' => 'Thi', 'slot_time' => '15:00:00', 'total_order' => 15]
 ];
 
 foreach ($collectionSlots as $slot) {

@@ -2,6 +2,9 @@
 session_start();
 require 'C:\xampp\htdocs\E-commerce\backend\connect.php';
 
+
+
+
 $conn = getDBConnection();
 if (!$conn) {
     die("Database connection failed");
@@ -348,6 +351,58 @@ error_log("===== END DEBUG =====");
             color: #666;
             margin-top: 5px;
         }
+
+        .slot-selection {
+            margin-top: 15px;
+        }
+
+        .date-selection, .time-selection {
+            margin-bottom: 15px;
+        }
+
+        .date-selection h4, .time-selection h4 {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .date-buttons, .time-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .date-buttons button, .time-buttons button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .date-buttons button:hover, .time-buttons button:hover {
+            border-color: #4CAF50;
+            color: #4CAF50;
+        }
+
+        .date-buttons button.active, .time-buttons button.active {
+            background: #4CAF50;
+            color: #fff;
+            border-color: #4CAF50;
+        }
+
+        .slot-info {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .slot-warning {
+            font-size: 14px;
+            color: #e53935;
+            margin-top: 10px;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
@@ -407,6 +462,8 @@ error_log("===== END DEBUG =====");
         <button type="button" class="btn red" onclick="clearCart()">Clear Cart</button>
       </div>
 
+      
+
      
 
       <div class="payment-methods">
@@ -418,23 +475,30 @@ error_log("===== END DEBUG =====");
 
     <div class="cart-right">
       <div class="pickup-time">
-        <h3>Pickup Time</h3>
-        <div class="days">
-          <button type="button" class="active">Wed</button>
-          <button type="button">Thurs</button>
-          <button type="button">Fri</button>
-        </div>
-        <div class="slots">
-          <button type="button">10–13</button>
-          <button type="button" class="active">13–16</button>
-          <button type="button">16–19</button>
+        <h3>Collection Slot</h3>
+        <p class="slot-info">Please select a collection slot at least 24 hours in advance.</p>
+        <div class="slot-selection">
+            <div class="date-selection">
+                <h4>Select Date</h4>
+                <div class="date-buttons" id="dateButtons">
+                    <!-- Dates will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="time-selection">
+                <h4>Select Time</h4>
+                <div class="time-buttons" id="timeButtons">
+                    <!-- Time slots will be populated by JavaScript -->
+                </div>
+            </div>
+            <input type="hidden" id="selectedSlotId" name="slot_id" value="">
+            <p class="slot-warning" style="display: none; color: #e53935; margin-top: 10px;"></p>
         </div>
       </div>
 
       <div class="total-section">
         <p>Sub Total: <strong>$<span id="total-price"><?= number_format($total_price, 2); ?></span></strong></p>
         <p>Total: <strong>$<span id="final-price"><?= number_format($total_price, 2); ?></span></strong></p>
-        <a href="checkout.php" class="btn green full">Proceed to Checkout</a>
+        <button id="checkoutBtn" class="btn green full">Proceed to Checkout</button>
       </div>
     </div>
   </div>
@@ -592,12 +656,106 @@ function clearCart() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.pickup-time button').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const siblings = Array.from(this.parentElement.children);
-            siblings.forEach(sib => sib.classList.remove('active'));
-            this.classList.add('active');
+    const dateButtons = document.getElementById('dateButtons');
+    const timeButtons = document.getElementById('timeButtons');
+    const selectedSlotId = document.getElementById('selectedSlotId');
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    const slotWarning = document.querySelector('.slot-warning');
+    
+    // Fetch available slots
+    fetch('collection_slot.php?action=get_slots')
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.error || 'Failed to fetch collection slots');
+                });
+            }
+            return response.json();
+        })
+        .then(response => {
+            if (!response.success) {
+                throw new Error(response.error || 'Failed to fetch collection slots');
+            }
+            
+            const slots = response.data;
+            if (!Array.isArray(slots) || slots.length === 0) {
+                slotWarning.textContent = 'No collection slots available at this time.';
+                slotWarning.style.display = 'block';
+                checkoutBtn.disabled = true;
+                return;
+            }
+            
+            // Group slots by date
+            const slotsByDate = {};
+            slots.forEach(slot => {
+                if (!slotsByDate[slot.date]) {
+                    slotsByDate[slot.date] = [];
+                }
+                slotsByDate[slot.date].push(slot);
+            });
+            
+            // Create date buttons
+            Object.keys(slotsByDate).sort().forEach(date => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = formatDate(date);
+                button.dataset.date = date;
+                button.addEventListener('click', () => selectDate(date, slotsByDate[date]));
+                dateButtons.appendChild(button);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching slots:', error);
+            slotWarning.textContent = error.message || 'Error loading collection slots. Please try again.';
+            slotWarning.style.display = 'block';
+            checkoutBtn.disabled = true;
         });
+    
+    function selectDate(date, slots) {
+        // Update date buttons
+        dateButtons.querySelectorAll('button').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.date === date);
+        });
+        
+        // Clear and update time buttons
+        timeButtons.innerHTML = '';
+        slots.forEach(slot => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = `${slot.time_slot} - ${getEndTime(slot.time_slot)}`;
+            button.dataset.slotId = slot.slot_id;
+            button.addEventListener('click', () => selectTimeSlot(slot));
+            timeButtons.appendChild(button);
+        });
+    }
+    
+    function getEndTime(startTime) {
+        const [hours, minutes] = startTime.split(':');
+        const endTime = new Date();
+        endTime.setHours(parseInt(hours) + 3, parseInt(minutes), 0);
+        return endTime.toTimeString().slice(0, 5);
+    }
+    
+    function formatDate(dateStr) {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+    
+    function selectTimeSlot(slot) {
+        // Update time buttons
+        timeButtons.querySelectorAll('button').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.slotId === slot.slot_id);
+        });
+        
+        // Update hidden input and enable checkout
+        selectedSlotId.value = slot.slot_id;
+        checkoutBtn.disabled = false;
+        slotWarning.style.display = 'none';
+    }
+    
+    // Update checkout button click handler
+    checkoutBtn.addEventListener('click', function() {
+        window.location.href = 'checkout.php';
     });
 });
 </script>
