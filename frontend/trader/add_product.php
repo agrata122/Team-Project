@@ -55,6 +55,7 @@ if (isset($_POST['add'])) {
         $allergy_information = filter_var($_POST['allergy_information'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         $product_status = filter_var($_POST['product_status'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         $shop_id = $_POST['shop_id'];
+        $rfid_tag = filter_var($_POST['rfid_tag'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         $product_category_name = '';
         foreach ($shops as $shop) {
             if ($shop['shop_id'] == $shop_id) {
@@ -77,11 +78,15 @@ if (isset($_POST['add'])) {
             $sql = "INSERT INTO product (
                         product_name, description, price, stock, min_order, max_order,
                         allergy_information, product_image, add_date, product_status,
-                        shop_id, product_category_name
+                        shop_id, product_category_name, rfid_tag
                     ) VALUES (
                         :product_name, :description, :price, :stock, :min_order, :max_order,
-                        :allergy_information, :product_image, TO_DATE(:add_date, 'YYYY-MM-DD'), :product_status,
-                        :shop_id, :product_category_name
+                        :allergy_information, :product_image, TO_DATE(:add_date, 'YYYY-MM-DD'), 
+                        CASE 
+                            WHEN :product_status = 'In Stock' THEN :product_status || ' ' || :rfid_tag || ' '
+                            ELSE :product_status
+                        END,
+                        :shop_id, :product_category_name, :rfid_tag
                     )";
 
             $stmt = oci_parse($conn, $sql);
@@ -99,6 +104,7 @@ if (isset($_POST['add'])) {
             oci_bind_by_name($stmt, ':product_status', $product_status);
             oci_bind_by_name($stmt, ':shop_id', $shop_id);
             oci_bind_by_name($stmt, ':product_category_name', $product_category_name);
+            oci_bind_by_name($stmt, ':rfid_tag', $rfid_tag);
 
             $result = oci_execute($stmt);
             if ($result) {
@@ -457,7 +463,7 @@ if (isset($_POST['add'])) {
                     </div>
                 </div>
 
-                <!-- Allergy Information Field - New Addition -->
+                <!-- Allergy Information Field -->
                 <div class="full-width">
                     <div class="form-group">
                         <label>Allergy Information</label>
@@ -466,11 +472,51 @@ if (isset($_POST['add'])) {
                 </div>
 
                 <!-- Submit Button -->
+                <button type="button" class="submit-btn" id="enable-rfid">🔄 Scan via RFID</button>
+                <p id="scan-status" style="color: green; display: none;">Scanning RFID...</p>
+
                 <button type="submit" class="submit-btn" name="add">
                     <i class="fas fa-plus-circle"></i> Add Product
                 </button>
             </div>
         </form>
     </div>
+
+    <script>
+        let scanning = false;
+
+        document.getElementById('enable-rfid').addEventListener('click', () => {
+            scanning = true;
+            document.getElementById('scan-status').style.display = 'block';
+            document.getElementById('scan-status').textContent = "🔄 Scanning RFID...";
+
+            // Trigger Python script via PHP backend
+            fetch('../../trigger_rfid.php')
+                .then(() => pollRFID());
+        });
+
+        function pollRFID() {
+            if (!scanning) return;
+
+            fetch('../../rfid_scan.json?' + new Date().getTime())
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.data && data.data.product_name) {
+                        // Fill the form
+                        document.querySelector('[name="product_name"]').value = data.data.product_name;
+                        document.querySelector('[name="description"]').value = data.data.description;
+                        document.querySelector('[name="price"]').value = data.data.price;
+                        document.querySelector('[name="stock"]').value = data.data.stock;
+                        document.querySelector('[name="shop_id"]').value = data.data.shop_id;
+
+                        document.getElementById('scan-status').textContent = "✔️ RFID scanned successfully!";
+                        scanning = false;
+                    } else {
+                        setTimeout(pollRFID, 1000);
+                    }
+                })
+                .catch(() => setTimeout(pollRFID, 1000));
+        }
+    </script>
 </body>
 </html>

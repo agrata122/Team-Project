@@ -406,6 +406,30 @@ $customers = fetchAllOCI($customersStmt);
                 </a>
             </li>
             <li>
+                <a href="Admin_daily_reports.php">
+                    <i class="fas fa-user-tie"></i>
+                    <span>Daily Reports</span>
+                </a>
+            </li>
+            <li>
+                <a href="Admin_weekly_reports.php">
+                    <i class="fas fa-user-tie"></i>
+                    <span>Weekly Reports</span>
+                </a>
+            </li>
+            <li>
+                <a href="Admin_monthly_reports.php">
+                    <i class="fas fa-user-tie"></i>
+                    <span>Monthly Reports</span>
+                </a>
+            </li>
+            <li>
+                <a href="product_sales_reports.php">
+                    <i class="fas fa-user-tie"></i>
+                    <span>Product Sales Reports</span>
+                </a>
+            </li>
+            <li>
                 <a href="logout_admin.php">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Logout</span>

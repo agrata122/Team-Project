@@ -14,7 +14,7 @@ require_once 'C:\xampp\htdocs\E-commerce\backend\connect.php';
 $conn = getDBConnection();
 
 if (!$conn) {
-    die("❌ Failed to connect to Oracle database.");
+    die("Failed to connect to Oracle database.");
 }
 
 // Fetch trader data from users table
@@ -30,13 +30,30 @@ try {
     }
     
     oci_bind_by_name($stmt, ':user_id', $user_id);
+    
+    // Define columns before execution
+    oci_define_by_name($stmt, 'USER_ID', $user_id_col);
+    oci_define_by_name($stmt, 'FULL_NAME', $full_name_col);
+    oci_define_by_name($stmt, 'EMAIL', $email_col);
+    oci_define_by_name($stmt, 'ROLE', $role_col);
+    
     $result = oci_execute($stmt);
     if (!$result) {
         throw new Exception("Failed to execute query: " . oci_error($stmt)['message']);    
     }
     
-    $userData = oci_fetch_assoc($stmt);
-    if (!$userData) {
+    // Fetch the data
+    $userData = [];
+    if (oci_fetch($stmt)) {
+        $userData = [
+            'USER_ID' => $user_id_col,
+            'FULL_NAME' => $full_name_col,
+            'EMAIL' => $email_col,
+            'ROLE' => $role_col
+        ];
+    }
+    
+    if (empty($userData)) {
         throw new Exception("Trader data not found");
     }
 
@@ -45,32 +62,206 @@ try {
         $shopsQuery = "SELECT * FROM shops WHERE trader_id = :trader_id";
         $shopsStmt = oci_parse($conn, $shopsQuery);
         oci_bind_by_name($shopsStmt, ':trader_id', $user_id);
+        
+        // Define columns for shops
+        oci_define_by_name($shopsStmt, 'SHOP_ID', $shop_id_col);
+        oci_define_by_name($shopsStmt, 'SHOP_NAME', $shop_name_col);
+        oci_define_by_name($shopsStmt, 'TRADER_ID', $trader_id_col);
+        
         oci_execute($shopsStmt);
         
         $shops = [];
-        while ($row = oci_fetch_assoc($shopsStmt)) {
-            $shops[] = $row;
+        while (oci_fetch($shopsStmt)) {
+            $shops[] = [
+                'SHOP_ID' => $shop_id_col,
+                'SHOP_NAME' => $shop_name_col,
+                'TRADER_ID' => $trader_id_col
+            ];
         }
         $_SESSION['shops'] = $shops;
     }
 
-    // Fetch recent orders (limit to 5 manually)
-    // Debugging: Let's first check the structure of the orders table
-    $tableCheckQuery = "SELECT column_name FROM all_tab_columns WHERE table_name = 'ORDERS'";
-    $tableCheckStmt = oci_parse($conn, $tableCheckQuery);
-    oci_execute($tableCheckStmt);
+    // Fetch trader's shop category
+    $shopCategoryQuery = "SELECT DISTINCT shop_category 
+                         FROM shops 
+                         WHERE user_id = :user_id";
+    $shopCategoryStmt = oci_parse($conn, $shopCategoryQuery);
+    oci_bind_by_name($shopCategoryStmt, ":user_id", $user_id);
+    oci_execute($shopCategoryStmt);
     
-    $columns = [];
-    while ($row = oci_fetch_assoc($tableCheckStmt)) {
-        $columns[] = $row['COLUMN_NAME'];
+    $shopCategories = [];
+    while (oci_fetch($shopCategoryStmt)) {
+        $shopCategories[] = oci_result($shopCategoryStmt, 'SHOP_CATEGORY');
+    }
+
+    // Fetch order statistics for trader's category
+    $statsQuery = "SELECT 
+        COUNT(*) as total_orders,
+        NVL(SUM(o.total_amount), 0) as total_sales,
+        SUM(CASE WHEN UPPER(o.status) = 'COMPLETED' THEN 1 ELSE 0 END) as completed_orders,
+        SUM(CASE WHEN UPPER(o.status) = 'PENDING' THEN 1 ELSE 0 END) as pending_orders
+        FROM orders o
+        JOIN cart c ON o.cart_id = c.cart_id
+        JOIN product_cart pc ON c.cart_id = pc.cart_id
+        JOIN product p ON pc.product_id = p.product_id
+        JOIN shops s ON p.shop_id = s.shop_id
+        WHERE s.user_id = :user_id
+        AND s.shop_category = (
+            SELECT DISTINCT shop_category 
+            FROM shops 
+            WHERE user_id = :user_id
+        )";
+    $statsStmt = oci_parse($conn, $statsQuery);
+    if (!$statsStmt) {
+        throw new Exception("Failed to parse stats query: " . oci_error($conn)['message']);
     }
     
-    // Simplify the query to make it work with your schema
-    $ordersQuery = "SELECT o.* FROM orders o WHERE 1=1 ORDER BY o.order_date DESC";
+    oci_bind_by_name($statsStmt, ":user_id", $user_id);
+    
+    // Define columns for stats
+    oci_define_by_name($statsStmt, 'TOTAL_ORDERS', $total_orders_col);
+    oci_define_by_name($statsStmt, 'TOTAL_SALES', $total_sales_col);
+    oci_define_by_name($statsStmt, 'COMPLETED_ORDERS', $completed_orders_col);
+    oci_define_by_name($statsStmt, 'PENDING_ORDERS', $pending_orders_col);
+    
+    $result = oci_execute($statsStmt);
+    if (!$result) {
+        throw new Exception("Failed to execute stats query: " . oci_error($statsStmt)['message']);
+    }
+    
+    $orderStats = [];
+    if (oci_fetch($statsStmt)) {
+        $orderStats = [
+            'TOTAL_ORDERS' => $total_orders_col,
+            'TOTAL_SALES' => $total_sales_col,
+            'COMPLETED_ORDERS' => $completed_orders_col,
+            'PENDING_ORDERS' => $pending_orders_col
+        ];
+    }
+
+    // Fetch daily report data for trader's category
+    $dailyQuery = "SELECT 
+        TO_CHAR(TRUNC(o.order_date), 'YYYY-MM-DD') as \"order_date\",
+        COUNT(*) as order_count,
+        NVL(SUM(o.total_amount), 0) as total_sales
+        FROM orders o
+        JOIN cart c ON o.cart_id = c.cart_id
+        JOIN product_cart pc ON c.cart_id = pc.cart_id
+        JOIN product p ON pc.product_id = p.product_id
+        JOIN shops s ON p.shop_id = s.shop_id
+        WHERE s.user_id = :user_id
+        AND o.order_date >= TRUNC(SYSDATE) - 7
+        GROUP BY TRUNC(o.order_date)
+        ORDER BY TRUNC(o.order_date)";
+    $dailyStmt = oci_parse($conn, $dailyQuery);
+    oci_bind_by_name($dailyStmt, ":user_id", $user_id);
+    
+    // Define columns for daily data
+    oci_define_by_name($dailyStmt, 'ORDER_DATE', $date_col);
+    oci_define_by_name($dailyStmt, 'ORDER_COUNT', $order_count_col);
+    oci_define_by_name($dailyStmt, 'TOTAL_SALES', $daily_sales_col);
+    
+    oci_execute($dailyStmt);
+    
+    $dailyData = [];
+    while (oci_fetch($dailyStmt)) {
+        $dailyData[] = [
+            'DATE' => $date_col,
+            'ORDER_COUNT' => (int)$order_count_col,
+            'TOTAL_SALES' => (float)$daily_sales_col
+        ];
+    }
+
+    // Fetch weekly report data for trader's category
+    $weeklyQuery = "SELECT 
+        TO_CHAR(TRUNC(o.order_date, 'IW'), 'YYYY-MM-DD') as week_start,
+        COUNT(*) as order_count,
+        NVL(SUM(o.total_amount), 0) as total_sales
+        FROM orders o
+        JOIN cart c ON o.cart_id = c.cart_id
+        JOIN product_cart pc ON c.cart_id = pc.cart_id
+        JOIN product p ON pc.product_id = p.product_id
+        JOIN shops s ON p.shop_id = s.shop_id
+        WHERE s.user_id = :user_id
+        AND o.order_date >= TRUNC(SYSDATE) - 30
+        GROUP BY TRUNC(o.order_date, 'IW')
+        ORDER BY TRUNC(o.order_date, 'IW')";
+    $weeklyStmt = oci_parse($conn, $weeklyQuery);
+    oci_bind_by_name($weeklyStmt, ":user_id", $user_id);
+    
+    // Define columns for weekly data
+    oci_define_by_name($weeklyStmt, 'WEEK_START', $week_start_col);
+    oci_define_by_name($weeklyStmt, 'ORDER_COUNT', $weekly_order_count_col);
+    oci_define_by_name($weeklyStmt, 'TOTAL_SALES', $weekly_sales_col);
+    
+    oci_execute($weeklyStmt);
+    
+    $weeklyData = [];
+    while (oci_fetch($weeklyStmt)) {
+        $weeklyData[] = [
+            'WEEK_START' => $week_start_col,
+            'ORDER_COUNT' => (int)$weekly_order_count_col,
+            'TOTAL_SALES' => (float)$weekly_sales_col
+        ];
+    }
+
+    // Fetch monthly report data for trader's category
+    $monthlyQuery = "SELECT 
+        TO_CHAR(TRUNC(o.order_date, 'MM'), 'YYYY-MM-DD') as month_start,
+        COUNT(*) as order_count,
+        NVL(SUM(o.total_amount), 0) as total_sales
+        FROM orders o
+        JOIN cart c ON o.cart_id = c.cart_id
+        JOIN product_cart pc ON c.cart_id = pc.cart_id
+        JOIN product p ON pc.product_id = p.product_id
+        JOIN shops s ON p.shop_id = s.shop_id
+        WHERE s.user_id = :user_id
+        AND o.order_date >= TRUNC(SYSDATE) - 365
+        GROUP BY TRUNC(o.order_date, 'MM')
+        ORDER BY TRUNC(o.order_date, 'MM')";
+    $monthlyStmt = oci_parse($conn, $monthlyQuery);
+    oci_bind_by_name($monthlyStmt, ":user_id", $user_id);
+    
+    // Define columns for monthly data
+    oci_define_by_name($monthlyStmt, 'MONTH_START', $month_start_col);
+    oci_define_by_name($monthlyStmt, 'ORDER_COUNT', $monthly_order_count_col);
+    oci_define_by_name($monthlyStmt, 'TOTAL_SALES', $monthly_sales_col);
+    
+    oci_execute($monthlyStmt);
+    
+    $monthlyData = [];
+    while (oci_fetch($monthlyStmt)) {
+        $monthlyData[] = [
+            'MONTH_START' => $month_start_col,
+            'ORDER_COUNT' => (int)$monthly_order_count_col,
+            'TOTAL_SALES' => (float)$monthly_sales_col
+        ];
+    }
+
+    // Fetch recent orders for trader's category
+    $ordersQuery = "SELECT DISTINCT o.order_id, o.order_date, o.total_amount, o.status,
+                   u.full_name as customer_name
+                   FROM orders o
+                   JOIN cart c ON o.cart_id = c.cart_id
+                   JOIN product_cart pc ON c.cart_id = pc.cart_id
+                   JOIN product p ON pc.product_id = p.product_id
+                   JOIN shops s ON p.shop_id = s.shop_id
+                   JOIN users u ON o.user_id = u.user_id
+                   WHERE s.user_id = :user_id
+                   ORDER BY o.order_date DESC";
     $ordersStmt = oci_parse($conn, $ordersQuery);
     if (!$ordersStmt) {
         throw new Exception("Failed to parse orders query: " . oci_error($conn)['message']);
     }
+    
+    oci_bind_by_name($ordersStmt, ":user_id", $user_id);
+    
+    // Define columns for orders
+    oci_define_by_name($ordersStmt, 'ORDER_ID', $order_id_col);
+    oci_define_by_name($ordersStmt, 'CUSTOMER_NAME', $customer_name_col);
+    oci_define_by_name($ordersStmt, 'ORDER_DATE', $order_date_col);
+    oci_define_by_name($ordersStmt, 'TOTAL_AMOUNT', $total_amount_col);
+    oci_define_by_name($ordersStmt, 'STATUS', $status_col);
     
     $result = oci_execute($ordersStmt);
     if (!$result) {
@@ -79,29 +270,16 @@ try {
 
     $recentOrders = [];
     $counter = 0;
-    while (($row = oci_fetch_assoc($ordersStmt)) && $counter < 5) {
-        $recentOrders[] = $row;
+    while (oci_fetch($ordersStmt) && $counter < 5) {
+        $recentOrders[] = [
+            'ORDER_ID' => $order_id_col,
+            'CUSTOMER_NAME' => $customer_name_col,
+            'ORDER_DATE' => $order_date_col,
+            'TOTAL_AMOUNT' => $total_amount_col,
+            'STATUS' => $status_col
+        ];
         $counter++;
     }
-
-    // Fetch order statistics - simplified query to match your schema
-    $statsQuery = "SELECT 
-        COUNT(*) as total_orders,
-        SUM(total_amount) as total_sales,
-        SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completed_orders,
-        SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending_orders
-        FROM orders";
-    $statsStmt = oci_parse($conn, $statsQuery);
-    if (!$statsStmt) {
-        throw new Exception("Failed to parse stats query: " . oci_error($conn)['message']);
-    }
-    
-    $result = oci_execute($statsStmt);
-    if (!$result) {
-        throw new Exception("Failed to execute stats query: " . oci_error($statsStmt)['message']);
-    }
-    
-    $orderStats = oci_fetch_assoc($statsStmt);
 
     // Process order actions if submitted
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id']) && isset($_POST['action'])) {
@@ -141,6 +319,9 @@ try {
     if (isset($ordersStmt)) oci_free_statement($ordersStmt);
     if (isset($statsStmt)) oci_free_statement($statsStmt);
     if (isset($updateStmt)) oci_free_statement($updateStmt);
+    if (isset($dailyStmt)) oci_free_statement($dailyStmt);
+    if (isset($weeklyStmt)) oci_free_statement($weeklyStmt);
+    if (isset($monthlyStmt)) oci_free_statement($monthlyStmt);
     
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());
@@ -158,6 +339,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trader Dashboard - FresGrub</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary: #2e7d32;
@@ -445,6 +627,136 @@ try {
             border-radius: 4px;
             box-sizing: border-box;
         }
+
+        .report-section {
+            margin-top: 30px;
+        }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .report-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .report-title {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        .report-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .report-tab {
+            padding: 10px 20px;
+            background: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .report-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .report-content {
+            display: none;
+        }
+
+        .report-content.active {
+            display: block;
+        }
+
+        .btn-edit-shop {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 12px;
+        }
+
+        .btn-edit-shop:hover {
+            background-color: #0277bd;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 50%;
+            max-width: 600px;
+            position: relative;
+        }
+
+        .close {
+            position: absolute;
+            right: 20px;
+            top: 10px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .form-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
     </style>
 </head>
 <body>
@@ -470,15 +782,41 @@ try {
                 </a>
             </li>
             <li>
-                <a href="/E-commerce/frontend/Includes/pages/product_list.php">
+                <a href="My_products.php">
                     <i class="fas fa-list"></i>
-                    <span>View Products</span>
+                    <span>Manage Products</span>
                 </a>
             </li>
             <li>
-                <a href="\E-commerce\frontend\user\user_profile.php">
+                <a href="Daily_reports.php">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Daily Reports</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="Weekly_reports.php.php">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Weekly Reports</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="Monthly_reports.php">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Monthly Reports</span>
+                </a>
+            </li>
+            <li>
+                <a href="Invoice.php">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Invoice</span>
+                </a>
+            </li>
+            <li>
+                <a href="trader_profile.php">
                     <i class="fas fa-user"></i>
-                    <span>View Profile</span>
+                    <span>My Profile</span>
                 </a>
             </li>
             <li>
@@ -513,14 +851,8 @@ try {
                         </li>
                     <?php endforeach; ?>
                 </ul>
-                <a href="add_shop.php" class="btn-primary">
-                    <i class="fas fa-plus"></i> Add Shop Information
-                </a>
             <?php else: ?>
                 <p class="no-data">You have no shops listed.</p>
-                <a href="add_shop.php" class="btn-primary">
-                    <i class="fas fa-plus"></i> Create Your First Shop
-                </a>
             <?php endif; ?>
         </div>
 
@@ -565,7 +897,7 @@ try {
                             <tr>
                                 <td><?php echo htmlspecialchars($order['ORDER_ID']); ?></td>
                                 <td><?php echo isset($order['CUSTOMER_NAME']) ? htmlspecialchars($order['CUSTOMER_NAME']) : 'Customer'; ?></td>
-                                <td><?php echo isset($order['ORDER_DATE']) ? date('m/d/Y', strtotime($order['ORDER_DATE'])) : '-'; ?></td>
+                                <td><?php echo isset($order['ORDER_DATE']) ? $order['ORDER_DATE'] : '-'; ?></td>
                                 <td>$<?php echo isset($order['TOTAL_AMOUNT']) ? number_format($order['TOTAL_AMOUNT'], 2) : '0.00'; ?></td>
                                 <td class="status-<?php echo isset($order['STATUS']) ? strtolower(htmlspecialchars($order['STATUS'])) : 'pending'; ?>">
                                     <?php echo isset($order['STATUS']) ? ucfirst(strtolower(htmlspecialchars($order['STATUS']))) : 'Pending'; ?>
@@ -602,6 +934,68 @@ try {
                 </tbody>
             </table>
         </div>
+
+        <!-- Reports Section -->
+        <div class="card report-section">
+            <h3 class="card-title">Sales Reports</h3>
+            
+            <div class="report-tabs">
+                <button class="report-tab active" data-tab="daily">Daily Report</button>
+                <button class="report-tab" data-tab="weekly">Weekly Report</button>
+                <button class="report-tab" data-tab="monthly">Monthly Report</button>
+            </div>
+
+            <div class="report-content active" id="daily-report">
+                <div class="report-grid">
+                    <div class="report-card">
+                        <h4 class="report-title">Daily Orders</h4>
+                        <div class="chart-container">
+                            <canvas id="dailyOrdersChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="report-card">
+                        <h4 class="report-title">Daily Sales</h4>
+                        <div class="chart-container">
+                            <canvas id="dailySalesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-content" id="weekly-report">
+                <div class="report-grid">
+                    <div class="report-card">
+                        <h4 class="report-title">Weekly Orders</h4>
+                        <div class="chart-container">
+                            <canvas id="weeklyOrdersChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="report-card">
+                        <h4 class="report-title">Weekly Sales</h4>
+                        <div class="chart-container">
+                            <canvas id="weeklySalesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-content" id="monthly-report">
+                <div class="report-grid">
+                    <div class="report-card">
+                        <h4 class="report-title">Monthly Orders</h4>
+                        <div class="chart-container">
+                            <canvas id="monthlyOrdersChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="report-card">
+                        <h4 class="report-title">Monthly Sales</h4>
+                        <div class="chart-container">
+                            <canvas id="monthlySalesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -610,6 +1004,182 @@ try {
             if (item.href === window.location.href) {
                 item.classList.add('active');
             }
+        });
+
+        // Chart data
+        const dailyData = <?php echo json_encode($dailyData); ?>;
+        const weeklyData = <?php echo json_encode($weeklyData); ?>;
+        const monthlyData = <?php echo json_encode($monthlyData); ?>;
+
+        // Format dates
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        }
+
+        function formatWeek(dateStr) {
+            const date = new Date(dateStr);
+            return `Week ${date.getDate()}/${date.getMonth() + 1}`;
+        }
+
+        function formatMonth(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+        }
+
+        // Chart configurations
+        const chartConfig = {
+            type: 'line',
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        };
+
+        // Daily Charts
+        new Chart(document.getElementById('dailyOrdersChart'), {
+            ...chartConfig,
+            data: {
+                labels: dailyData.map(d => formatDate(d.DATE)),
+                datasets: [{
+                    label: 'Orders',
+                    data: dailyData.map(d => d.ORDER_COUNT),
+                    borderColor: '#2e7d32',
+                    tension: 0.1,
+                    fill: false
+                }]
+            }
+        });
+
+        new Chart(document.getElementById('dailySalesChart'), {
+            ...chartConfig,
+            data: {
+                labels: dailyData.map(d => formatDate(d.DATE)),
+                datasets: [{
+                    label: 'Sales (£)',
+                    data: dailyData.map(d => d.TOTAL_SALES),
+                    borderColor: '#0288d1',
+                    tension: 0.1,
+                    fill: false
+                }]
+            }
+        });
+
+        // Weekly Charts
+        new Chart(document.getElementById('weeklyOrdersChart'), {
+            ...chartConfig,
+            data: {
+                labels: weeklyData.map(d => formatWeek(d.WEEK_START)),
+                datasets: [{
+                    label: 'Orders',
+                    data: weeklyData.map(d => d.ORDER_COUNT),
+                    borderColor: '#2e7d32',
+                    tension: 0.1,
+                    fill: false
+                }]
+            }
+        });
+
+        new Chart(document.getElementById('weeklySalesChart'), {
+            ...chartConfig,
+            data: {
+                labels: weeklyData.map(d => formatWeek(d.WEEK_START)),
+                datasets: [{
+                    label: 'Sales (£)',
+                    data: weeklyData.map(d => d.TOTAL_SALES),
+                    borderColor: '#0288d1',
+                    tension: 0.1,
+                    fill: false
+                }]
+            }
+        });
+
+        // Monthly Charts
+        new Chart(document.getElementById('monthlyOrdersChart'), {
+            ...chartConfig,
+            data: {
+                labels: monthlyData.map(d => formatMonth(d.MONTH_START)),
+                datasets: [{
+                    label: 'Orders',
+                    data: monthlyData.map(d => d.ORDER_COUNT),
+                    borderColor: '#2e7d32',
+                    tension: 0.1,
+                    fill: false
+                }]
+            }
+        });
+
+        new Chart(document.getElementById('monthlySalesChart'), {
+            ...chartConfig,
+            data: {
+                labels: monthlyData.map(d => formatMonth(d.MONTH_START)),
+                datasets: [{
+                    label: 'Sales (£)',
+                    data: monthlyData.map(d => d.TOTAL_SALES),
+                    borderColor: '#0288d1',
+                    tension: 0.1,
+                    fill: false
+                }]
+            }
+        });
+
+        // Report tabs functionality
+        document.querySelectorAll('.report-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs and contents
+                document.querySelectorAll('.report-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.report-content').forEach(c => c.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding content
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tab}-report`).classList.add('active');
+            });
+        });
+
+        // Add this to your existing JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('editShopModal');
+            const closeBtn = document.getElementsByClassName('close')[0];
+            const editButtons = document.getElementsByClassName('btn-edit-shop');
+
+            // Open modal when edit button is clicked
+            Array.from(editButtons).forEach(button => {
+                button.addEventListener('click', function() {
+                    const shopId = this.getAttribute('data-shop-id');
+                    const shopName = this.getAttribute('data-shop-name');
+                    const shopCategory = this.getAttribute('data-shop-category');
+                    const shopDescription = this.getAttribute('data-shop-description');
+
+                    document.getElementById('edit_shop_id').value = shopId;
+                    document.getElementById('edit_shop_name').value = shopName;
+                    document.getElementById('edit_shop_category').value = shopCategory;
+                    document.getElementById('edit_shop_description').value = shopDescription;
+
+                    modal.style.display = 'block';
+                });
+            });
+
+            // Close modal when X is clicked
+            closeBtn.addEventListener('click', function() {
+                modal.style.display = 'none';
+            });
+
+            // Close modal when clicking outside
+            window.addEventListener('click', function(event) {
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            });
         });
     </script>
 </body>

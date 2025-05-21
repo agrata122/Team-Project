@@ -35,6 +35,32 @@ if (!$user) {
     exit();
 }
 
+// Query to get recent orders for the user
+$orders_sql = "SELECT o.order_id, o.order_date, o.total_amount, o.status,
+               p.product_name, pc.quantity, p.price
+               FROM orders o
+               JOIN cart c ON o.cart_id = c.cart_id
+               JOIN product_cart pc ON c.cart_id = pc.cart_id
+               JOIN product p ON pc.product_id = p.product_id
+               WHERE o.user_id = :user_id
+               ORDER BY o.order_date DESC";
+$orders_stid = oci_parse($db, $orders_sql);
+oci_bind_by_name($orders_stid, ":user_id", $user_id);
+
+if (!oci_execute($orders_stid)) {
+    echo "Failed to fetch orders.";
+    exit();
+}
+
+$recent_orders = [];
+$counter = 0;
+while ($row = oci_fetch_assoc($orders_stid)) {
+    if ($counter >= 3) break;
+    $recent_orders[] = $row;
+    $counter++;
+}
+oci_free_statement($orders_stid);
+
 // Determine the home page based on user role
 // Fixed to use uppercase key "ROLE"
 $homePage = ($user["ROLE"] === "trader") ? "trader_dashboard.php" : "home.php";
@@ -330,22 +356,20 @@ $homePage = ($user["ROLE"] === "trader") ? "trader_dashboard.php" : "home.php";
             <div class="sidebar-card">
                 <h3 class="section-title">Recent Orders</h3>
                 
-                <div class="order-item">
-                    <span class="order-name">Fresh Mangoes</span>
-                    <span class="order-price">$10.99</span>
-                </div>
+                <?php if (!empty($recent_orders)): ?>
+                    <?php foreach ($recent_orders as $order): ?>
+                        <div class="order-item">
+                            <span class="order-name"><?php echo htmlspecialchars($order['PRODUCT_NAME']); ?></span>
+                            <span class="order-price">$<?php echo number_format($order['PRICE'] * $order['QUANTITY'], 2); ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="order-item">
+                        <span class="order-name">No recent orders</span>
+                    </div>
+                <?php endif; ?>
                 
-                <div class="order-item">
-                    <span class="order-name">Yellow Bananas</span>
-                    <span class="order-price">$8.50</span>
-                </div>
-                
-                <div class="order-item">
-                    <span class="order-name">Watermelons</span>
-                    <span class="order-price">$20.50</span>
-                </div>
-                
-                <a href="all_orders.php" class="view-all">
+                <a href="recent_orders.php" class="view-all">
                     View All Orders <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
@@ -355,11 +379,11 @@ $homePage = ($user["ROLE"] === "trader") ? "trader_dashboard.php" : "home.php";
                 <h3 class="section-title">Quick Links</h3>
                 
                 <div class="quick-links">
-                    <a href="<?php echo $homePage; ?>" class="quick-link">
+                    <a href="/E-commerce/frontend/Includes/pages/homepage.php" class="quick-link">
                         <i class="fas fa-home"></i>
                         <span>Home</span>
                     </a>
-                    <a href="my_cart.php" class="quick-link">
+                    <a href="/E-commerce/frontend/Includes/cart/shopping_cart.php" class="quick-link">
                         <i class="fas fa-shopping-cart"></i>
                         <span>My Cart</span>
                     </a>
@@ -367,25 +391,19 @@ $homePage = ($user["ROLE"] === "trader") ? "trader_dashboard.php" : "home.php";
                         <i class="fas fa-history"></i>
                         <span>Order History</span>
                     </a>
-                    <a href="settings.php" class="quick-link">
-                        <i class="fas fa-cog"></i>
-                        <span>Settings</span>
+                    <a href="edit_profile.php" class="quick-link">
+                        <i class="fas fa-user-edit"></i>
+                        <span>Edit Profile</span>
+                    </a>
+                    
+                    <a href="../includes/logout.php" class="quick-link">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
                     </a>
                 </div>
             </div>
             
-            <!-- Security Card -->
-            <div class="sidebar-card">
-                <h3 class="section-title">Account Security</h3>
-                <a href="change_password.php" class="quick-link">
-                    <i class="fas fa-lock"></i>
-                    <span>Change Password</span>
-                </a>
-                <a href="two_factor.php" class="quick-link">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Two-Factor Auth</span>
-                </a>
-            </div>
+            
         </div>
     </div>
     

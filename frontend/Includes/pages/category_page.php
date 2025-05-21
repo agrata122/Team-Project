@@ -236,11 +236,30 @@ if (isset($_POST['add_to_wishlist'])) {
 }
 
 // Fetch products by shop category
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'default';
+$order_by = '';
+
+switch($sort) {
+    case 'price_low_high':
+        $order_by = 'ORDER BY p.price ASC';
+        break;
+    case 'price_high_low':
+        $order_by = 'ORDER BY p.price DESC';
+        break;
+    case 'rating_high_low':
+        $order_by = 'ORDER BY avg_rating DESC NULLS LAST';
+        break;
+    default:
+        $order_by = 'ORDER BY p.product_id DESC';
+}
+
 $select_products_sql = "
-    SELECT p.* 
+    SELECT p.*, 
+    (SELECT AVG(review_rating) FROM review r WHERE r.product_id = p.product_id) as avg_rating 
     FROM product p
     JOIN shops s ON p.shop_id = s.shop_id
     WHERE s.shop_category = :category
+    $order_by
 ";
 $select_products_stmt = oci_parse($conn, $select_products_sql);
 oci_bind_by_name($select_products_stmt, ':category', $category);
@@ -248,7 +267,7 @@ oci_execute($select_products_stmt);
 
 // Count products
 $count_products_sql = "
-    SELECT COUNT(*) AS total 
+    SELECT COUNT(*) as total 
     FROM product p
     JOIN shops s ON p.shop_id = s.shop_id
     WHERE s.shop_category = :category
@@ -256,10 +275,7 @@ $count_products_sql = "
 $count_products_stmt = oci_parse($conn, $count_products_sql);
 oci_bind_by_name($count_products_stmt, ':category', $category);
 oci_execute($count_products_stmt);
-$product_count = 0;
-if ($row = oci_fetch_assoc($count_products_stmt)) {
-    $product_count = $row['TOTAL'];
-}
+$product_count = oci_fetch_assoc($count_products_stmt)['TOTAL'];
 oci_free_statement($count_products_stmt);
 
 // Close connection
@@ -278,7 +294,49 @@ oci_close($conn);
    <!-- Toastify CSS -->
    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
    
+   <style>
+   .sort-container {
+       max-width: 1200px;
+       margin: 0 auto 20px;
+       padding: 0 20px;
+   }
    
+   .sort-form {
+       display: flex;
+       justify-content: flex-end;
+   }
+   
+   .sort-select {
+       padding: 8px 12px;
+       border: 1px solid #ddd;
+       border-radius: 4px;
+       background-color: white;
+       font-size: 14px;
+       cursor: pointer;
+       outline: none;
+   }
+   
+   .sort-select:hover {
+       border-color: #4CAF50;
+   }
+   
+   .rating {
+       display: flex;
+       align-items: center;
+       gap: 5px;
+       margin-top: 5px;
+       color: #666;
+   }
+   
+   .rating-stars {
+       color: #ffd700;
+   }
+   
+   .no-rating {
+       color: #999;
+       font-style: italic;
+   }
+   </style>
 </head>
 <body>
    <header>
@@ -306,6 +364,19 @@ oci_close($conn);
        <div class="category-header">
           
           <h1 class="heading"><?php echo $display_category; ?> Products</h1>
+       </div>
+       
+       <!-- Add sorting dropdown -->
+       <div class="sort-container">
+           <form method="GET" class="sort-form">
+               <input type="hidden" name="category" value="<?php echo $category; ?>">
+               <select name="sort" onchange="this.form.submit()" class="sort-select">
+                   <option value="default" <?= $sort === 'default' ? 'selected' : '' ?>>Sort by: Default</option>
+                   <option value="price_low_high" <?= $sort === 'price_low_high' ? 'selected' : '' ?>>Price: Low to High</option>
+                   <option value="price_high_low" <?= $sort === 'price_high_low' ? 'selected' : '' ?>>Price: High to Low</option>
+                   <option value="rating_high_low" <?= $sort === 'rating_high_low' ? 'selected' : '' ?>>Rating: High to Low</option>
+               </select>
+           </form>
        </div>
        
        <div class="product-container">
@@ -338,8 +409,23 @@ oci_close($conn);
             <?php endif; ?>
         </div>
         <h3><?= htmlspecialchars($fetch_product['PRODUCT_NAME']); ?></h3>
-        <p class="price">RS. <?= number_format($fetch_product['PRICE'], 2); ?></p>
+        <p class="price">£<?= number_format($fetch_product['PRICE'], 2); ?></p>
         <p class="stock">Available: <?= $fetch_product['STOCK'] ?> in stock</p>
+        <div class="rating">
+            <?php if ($fetch_product['AVG_RATING']): ?>
+                <span class="rating-stars">
+                    <?php
+                    $rating = round($fetch_product['AVG_RATING']);
+                    for ($i = 1; $i <= 5; $i++) {
+                        echo $i <= $rating ? '★' : '☆';
+                    }
+                    ?>
+                </span>
+                <span>(<?= number_format($fetch_product['AVG_RATING'], 1) ?>)</span>
+            <?php else: ?>
+                <span class="no-rating">No ratings yet</span>
+            <?php endif; ?>
+        </div>
     </div>
 
     <div class="card-actions">

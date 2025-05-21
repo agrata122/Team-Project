@@ -170,7 +170,7 @@ include '../../Includes/header.php';
             <h2>FEATURED PRODUCTS</h2>
         </div>
         <div class="view-all-products">
-            View all products >
+            <a href="/E-commerce/frontend/Includes/pages/product_list.php">View all products ></a>
         </div>
     </div>
 </section>
@@ -219,7 +219,6 @@ include '../../Includes/header.php';
         </div>
     </div>
 </section>
-
 
 
 </body>

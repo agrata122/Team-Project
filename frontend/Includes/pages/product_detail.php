@@ -466,9 +466,9 @@ oci_close($conn);
                 </div>
 
                 <div class="product-price">
-                    <span class="price">RS. <?php echo number_format($product['PRICE'], 2); ?></span>
+                    <span class="price">£<?php echo number_format($product['PRICE'], 2); ?></span>
                     <?php if (isset($product['OLD_PRICE']) && $product['OLD_PRICE'] > $product['PRICE']): ?>
-                        <span class="old-price">RS. <?php echo number_format($product['OLD_PRICE'], 2); ?></span>
+                        <span class="old-price">£<?php echo number_format($product['OLD_PRICE'], 2); ?></span>
                         <span class="discount"><?php echo round((($product['OLD_PRICE'] - $product['PRICE']) / $product['OLD_PRICE']) * 100); ?>% OFF</span>
                     <?php endif; ?>
                 </div>
@@ -647,7 +647,7 @@ oci_close($conn);
 
                         <tr>
                             <th>Price</th>
-                            <td>RS. <?php echo number_format($product['PRICE'], 2); ?></td>
+                            <td>£<?php echo number_format($product['PRICE'], 2); ?></td>
                         </tr>
                         <?php if (isset($product['PRODUCT_SKU']) && !empty($product['PRODUCT_SKU'])): ?>
                             <tr>
@@ -705,7 +705,7 @@ oci_close($conn);
                             </div>
                             <div class="related-product-info">
                                 <h3><?php echo htmlspecialchars($related['PRODUCT_NAME']); ?></h3>
-                                <p class="related-product-price">RS. <?php echo number_format($related['PRICE'], 2); ?></p>
+                                <p class="related-product-price">£<?php echo number_format($related['PRICE'], 2); ?></p>
                             </div>
                         </div>
                     <?php endforeach; ?>

@@ -14,6 +14,24 @@ $product = $product_data;
     <h3><?php echo htmlspecialchars($product['name']); ?></h3>
     <p class="price">RS. <?php echo number_format($product['price'], 2); ?></p>
     
+    <?php if (isset($product['rating'])): ?>
+    <div class="rating">
+        <?php if ($product['rating']): ?>
+            <span class="rating-stars">
+                <?php
+                $rating = round($product['rating']);
+                for ($i = 1; $i <= 5; $i++) {
+                    echo $i <= $rating ? '★' : '☆';
+                }
+                ?>
+            </span>
+            <span>(<?= number_format($product['rating'], 1) ?>)</span>
+        <?php else: ?>
+            <span class="no-rating">No ratings yet</span>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+    
     <div class="card-actions">
         <!-- Add to Cart Button -->
         <button class="add-to-cart" onclick="event.stopPropagation();">Add to Cart</button>
@@ -28,6 +46,25 @@ $product = $product_data;
         <span class="wishlist" onclick="event.stopPropagation();">&#9825;</span> 
     </div>
 </div>
+
+<style>
+.rating {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 5px 0;
+    color: #666;
+}
+
+.rating-stars {
+    color: #ffd700;
+}
+
+.no-rating {
+    color: #999;
+    font-style: italic;
+}
+</style>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
