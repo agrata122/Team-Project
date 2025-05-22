@@ -105,37 +105,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['apply_coupon'])) {
 
 // Handle checkout submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proceed_to_payment'])) {
+    // Debug logging
+    error_log("POST data: " . print_r($_POST, true));
+    
     // Create order - using a two-step approach instead of RETURNING INTO
     $orderQuery = "INSERT INTO orders (order_amount, total_amount, coupon_id, status, 
-                   user_id, cart_id) 
+                   user_id, cart_id, collection_slot_id) 
                    VALUES (:order_amount, :total_amount, :coupon_id, 'pending', 
-                   :user_id, :cart_id)";
+                   :user_id, :cart_id, :collection_slot_id)";
     
     $stid = oci_parse($conn, $orderQuery);
     
     $coupon_id = isset($_SESSION['applied_coupon']) ? $_SESSION['applied_coupon'] : null;
+    $collection_slot_id = isset($_POST['collection_slot_id']) ? $_POST['collection_slot_id'] : null;
+    
+    // Debug logging
+    error_log("Collection slot ID: " . $collection_slot_id);
     
     oci_bind_by_name($stid, ":order_amount", $total_price);
     oci_bind_by_name($stid, ":total_amount", $final_price);
     oci_bind_by_name($stid, ":coupon_id", $coupon_id);
     oci_bind_by_name($stid, ":user_id", $numeric_user_id);
     oci_bind_by_name($stid, ":cart_id", $cart_id);
+    oci_bind_by_name($stid, ":collection_slot_id", $collection_slot_id);
+    
+    // Debug logging before execution
+    error_log("Executing order creation with collection_slot_id: " . $collection_slot_id);
     
     if (oci_execute($stid)) {
+        // Debug logging after successful execution
+        error_log("Order created successfully with collection_slot_id: " . $collection_slot_id);
         // Get the sequence value or the latest order_id for this user
         $getOrderIdQuery = "SELECT MAX(order_id) as last_order_id FROM orders WHERE user_id = :user_id";
         $stid = oci_parse($conn, $getOrderIdQuery);
         oci_bind_by_name($stid, ":user_id", $numeric_user_id);
         oci_execute($stid);
         $orderRow = oci_fetch_assoc($stid);
-        $order_id = $orderRow['LAST_ORDER_ID'];
         
-        $_SESSION['current_order_id'] = $order_id;
-        $_SESSION['order_total'] = $final_price;
-        
-        // Redirect to payment processing
-        header("Location: checkout.php?step=payment");
-        exit();
+        if ($orderRow && isset($orderRow['LAST_ORDER_ID'])) {
+            $order_id = $orderRow['LAST_ORDER_ID'];
+            $_SESSION['current_order_id'] = $order_id;
+            $_SESSION['order_total'] = $final_price;
+            
+            // Store order items
+            $itemsQuery = "SELECT pc.product_id, pc.quantity, p.price 
+                          FROM product_cart pc 
+                          JOIN product p ON pc.product_id = p.product_id 
+                          WHERE pc.cart_id = :cart_id";
+            $stid = oci_parse($conn, $itemsQuery);
+            oci_bind_by_name($stid, ":cart_id", $cart_id);
+            oci_execute($stid);
+            
+            while ($item = oci_fetch_assoc($stid)) {
+                $insertItemQuery = "INSERT INTO order_items (order_id, product_id, quantity, price) 
+                                  VALUES (:order_id, :product_id, :quantity, :price)";
+                $itemStid = oci_parse($conn, $insertItemQuery);
+                oci_bind_by_name($itemStid, ":order_id", $order_id);
+                oci_bind_by_name($itemStid, ":product_id", $item['PRODUCT_ID']);
+                oci_bind_by_name($itemStid, ":quantity", $item['QUANTITY']);
+                oci_bind_by_name($itemStid, ":price", $item['PRICE']);
+                oci_execute($itemStid);
+                oci_free_statement($itemStid);
+            }
+            
+            // Redirect to payment processing
+            header("Location: checkout.php?step=payment");
+            exit();
+        } else {
+            $error = "Error: Could not retrieve order ID after creation.";
+        }
     } else {
         $error = oci_error($stid);
         $order_error = "Error creating order: " . $error['message'];
@@ -149,277 +187,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proceed_to_payment'])
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout - E-commerce</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f5f5f5;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .checkout-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .checkout-steps {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            position: relative;
-        }
-        
-        .checkout-steps:before {
-            content: '';
-            position: absolute;
-            top: 15px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: #ddd;
-            z-index: 1;
-        }
-        
-        .step {
-            text-align: center;
-            position: relative;
-            z-index: 2;
-        }
-        
-        .step-number {
-            width: 30px;
-            height: 30px;
-            background: #ddd;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 10px;
-            font-weight: bold;
-            color: #fff;
-        }
-        
-        .step.active .step-number {
-            background: #4CAF50;
-        }
-        
-        .step.completed .step-number {
-            background: #2E7D32;
-        }
-        
-        .step-title {
-            font-size: 14px;
-            color: #777;
-        }
-        
-        .step.active .step-title {
-            color: #4CAF50;
-            font-weight: bold;
-        }
-        
-        .step.completed .step-title {
-            color: #2E7D32;
-        }
-        
-        .checkout-content {
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 30px;
-            margin-bottom: 30px;
-        }
-        
-        .section-title {
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-            font-size: 18px;
-            color: #333;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-        
-        input[type="text"],
-        input[type="email"],
-        input[type="tel"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        
-        .row {
-            display: flex;
-            flex-wrap: wrap;
-            margin: 0 -15px;
-        }
-        
-        .col-md-6 {
-            flex: 0 0 50%;
-            max-width: 50%;
-            padding: 0 15px;
-        }
-        
-        .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            text-align: center;
-            text-decoration: none;
-            transition: background 0.3s;
-        }
-        
-        .btn:hover {
-            background: #45a049;
-        }
-        
-        .btn-outline {
-            background: transparent;
-            border: 1px solid #4CAF50;
-            color: #4CAF50;
-        }
-        
-        .btn-outline:hover {
-            background: #f5f5f5;
-        }
-        
-        .order-summary {
-            background: #f9f9f9;
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 30px;
-        }
-        
-        .order-summary-title {
-            font-size: 18px;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .shop-group {
-            margin-bottom: 20px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 15px;
-        }
-        
-        .shop-header {
-            font-weight: 600;
-            margin-bottom: 10px;
-            color: #2E7D32;
-        }
-        
-        .order-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-            padding-left: 15px;
-        }
-        
-        .order-total {
-            display: flex;
-            justify-content: space-between;
-            font-weight: 600;
-            font-size: 18px;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
-        }
-        
-        .coupon-form {
-            display: flex;
-            margin-top: 15px;
-        }
-        
-        .coupon-form input {
-            flex-grow: 1;
-            margin-right: 10px;
-        }
-        
-        .alert {
-            padding: 10px 15px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-        
-        .alert-success {
-            background: #dff0d8;
-            color: #3c763d;
-        }
-        
-        .alert-danger {
-            background: #f2dede;
-            color: #a94442;
-        }
-        
-        .payment-methods {
-            margin-top: 30px;
-        }
-        
-        .payment-method {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .payment-method:hover {
-            border-color: #4CAF50;
-        }
-        
-        .payment-method.selected {
-            border-color: #4CAF50;
-            background: #f5f5f5;
-        }
-        
-        .payment-method input {
-            margin-right: 15px;
-        }
-        
-        .payment-method img {
-            height: 30px;
-            margin-left: auto;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        @media (max-width: 768px) {
-            .col-md-6 {
-                flex: 0 0 100%;
-                max-width: 100%;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/checkout.css">
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Footer.css">
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Header.css">
 </head>
 <body>
     <header>
@@ -453,6 +223,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proceed_to_payment'])
                 <div class="col-md-6">
                     <div class="checkout-content">
                         <h2 class="section-title">Billing Details</h2>
+                        
+                        <!-- Add hidden input for collection slot ID -->
+                        <?php if (isset($_POST['collection_slot_id'])): ?>
+                        <input type="hidden" name="collection_slot_id" value="<?php echo htmlspecialchars($_POST['collection_slot_id']); ?>">
+                        <?php endif; ?>
                         
                         <div class="form-group">
                             <label for="full_name">Full Name</label>
@@ -551,9 +326,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proceed_to_payment'])
         <div class="checkout-content">
             <h2 class="section-title">Payment</h2>
             
+            <?php
+            // Debug information
+            if (!isset($_SESSION['current_order_id'])) {
+                echo '<div class="alert alert-danger">Error: Order ID not found. Please try again.</div>';
+                echo '<div style="text-align: center; margin-top: 20px;">';
+                echo '<a href="checkout.php" class="btn btn-outline">Back to Order Details</a>';
+                echo '</div>';
+                exit();
+            }
+            ?>
+            
             <div id="paypal-button-container"></div>
-            
-            
             
             <div style="text-align: center; margin-top: 30px;">
                 <a href="checkout.php" class="btn btn-outline">Back to Order Details</a>
@@ -631,19 +415,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proceed_to_payment'])
                     alert("There was an error processing your payment. Please try again or contact support.");
                 }
             }).render('#paypal-button-container');
-            
-            // Toggle payment methods
-            document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    if (this.value === 'paypal') {
-                        document.getElementById('paypal-button-container').classList.remove('hidden');
-                        document.getElementById('credit-card-form').classList.add('hidden');
-                    } else {
-                        document.getElementById('paypal-button-container').classList.add('hidden');
-                        document.getElementById('credit-card-form').classList.remove('hidden');
-                    }
-                });
-            });
         </script>
         
         <?php elseif (isset($_GET['step']) && $_GET['step'] === 'confirmation'): ?>
@@ -651,12 +422,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proceed_to_payment'])
         <div class="checkout-content" style="text-align: center;">
             <h2>Thank you for your order!</h2>
             <p>Your order has been placed successfully.</p>
-            <p>Order ID: #<?php echo $_SESSION['current_order_id']; ?></p>
-            
-            <div style="margin: 30px 0;">
-                <a href="invoice.php?order_id=<?php echo $_SESSION['current_order_id']; ?>" class="btn" target="_blank">View Invoice</a>
-                <a href="/E-commerce/frontend/Includes/pages/homepage.php" class="btn btn-outline">Continue Shopping</a>
-            </div>
+            <?php if (isset($_SESSION['current_order_id'])): ?>
+                <p>Order ID: #<?php echo htmlspecialchars($_SESSION['current_order_id']); ?></p>
+                
+                <div style="margin: 30px 0;">
+                    <a href="invoice.php?order_id=<?php echo htmlspecialchars($_SESSION['current_order_id']); ?>" class="btn" target="_blank">View Invoice</a>
+                    <a href="/E-commerce/frontend/Includes/pages/homepage.php" class="btn btn-outline">Continue Shopping</a>
+                </div>
+            <?php else: ?>
+                <p>There was an issue retrieving your order details. Please contact customer support.</p>
+                <div style="margin: 30px 0;">
+                    <a href="/E-commerce/frontend/Includes/pages/homepage.php" class="btn btn-outline">Return to Homepage</a>
+                </div>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
     </div>

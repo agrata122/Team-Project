@@ -3,8 +3,6 @@ session_start();
 require 'C:\xampp\htdocs\E-commerce\backend\connect.php';
 
 
-
-
 $conn = getDBConnection();
 if (!$conn) {
     die("Database connection failed");
@@ -19,7 +17,7 @@ error_log("===== CART PAGE DEBUG =====");
 error_log("SESSION: " . print_r($_SESSION, true));
 error_log("COOKIES: " . print_r($_COOKIE, true));
 
-// Handle user ID - prioritize logged-in user over cookie
+// Handle user ID - only for logged-in users
 if (isset($_SESSION['user_id'])) {
     $user_id = $_SESSION['user_id'];
     error_log("Using user_id from SESSION: " . $user_id);
@@ -28,34 +26,8 @@ if (isset($_SESSION['user_id'])) {
     $cartQuery = "SELECT cart_id FROM cart WHERE user_id = :user_id";
     $stid = oci_parse($conn, $cartQuery);
     oci_bind_by_name($stid, ":user_id", $user_id);
-} elseif (isset($_COOKIE['guest_id'])) {
-    $user_id = $_COOKIE['guest_id'];
-    error_log("Using guest_id from COOKIE: " . $user_id);
-    
-    // Get cart for guest user
-    $cartQuery = "SELECT cart_id FROM guest_cart WHERE guest_id = :guest_id";
-    $stid = oci_parse($conn, $cartQuery);
-    oci_bind_by_name($stid, ":guest_id", $user_id, -1, SQLT_CHR);
 } else {
-    $user_id = 'guest_' . uniqid();
-    setcookie('guest_id', $user_id, time() + 60 * 60 * 24 * 30, "/");
-    error_log("Generated new guest_id: " . $user_id);
-    
-    // Create new guest cart
-    $createCartQuery = "INSERT INTO guest_cart (guest_id, add_date) VALUES (:guest_id, SYSDATE) RETURNING cart_id INTO :new_cart_id";
-    $stid = oci_parse($conn, $createCartQuery);
-    $new_cart_id = null;
-    oci_bind_by_name($stid, ":guest_id", $user_id, -1, SQLT_CHR);
-    oci_bind_by_name($stid, ":new_cart_id", $new_cart_id, 32, SQLT_INT);
-    
-    if (!oci_execute($stid)) {
-        $error = oci_error($stid);
-        error_log("Guest cart creation error: " . $error['message']);
-        die("Error creating your cart. Please try again.");
-    }
-    
-    $cart_id = $new_cart_id;
-    error_log("Created new guest cart with cart_id: " . $cart_id);
+    die("Please log in to access your cart");
 }
 
 if (!isset($cart_id)) {
@@ -70,21 +42,12 @@ if (!isset($cart_id)) {
         $cart_id = $cartRow['CART_ID'];
         error_log("Found existing cart_id: " . $cart_id);
     } else {
-        if (isset($_SESSION['user_id'])) {
-            // Create new cart for logged-in user
-            $createCartQuery = "INSERT INTO cart (user_id, add_date) VALUES (:user_id, SYSDATE) RETURNING cart_id INTO :new_cart_id";
-            $stid = oci_parse($conn, $createCartQuery);
-            $new_cart_id = null;
-            oci_bind_by_name($stid, ":user_id", $user_id);
-            oci_bind_by_name($stid, ":new_cart_id", $new_cart_id, 32, SQLT_INT);
-        } else {
-            // Create new guest cart
-            $createCartQuery = "INSERT INTO guest_cart (guest_id, add_date) VALUES (:guest_id, SYSDATE) RETURNING cart_id INTO :new_cart_id";
-            $stid = oci_parse($conn, $createCartQuery);
-            $new_cart_id = null;
-            oci_bind_by_name($stid, ":guest_id", $user_id, -1, SQLT_CHR);
-            oci_bind_by_name($stid, ":new_cart_id", $new_cart_id, 32, SQLT_INT);
-        }
+        // Create new cart for logged-in user
+        $createCartQuery = "INSERT INTO cart (user_id, add_date) VALUES (:user_id, SYSDATE) RETURNING cart_id INTO :new_cart_id";
+        $stid = oci_parse($conn, $createCartQuery);
+        $new_cart_id = null;
+        oci_bind_by_name($stid, ":user_id", $user_id);
+        oci_bind_by_name($stid, ":new_cart_id", $new_cart_id, 32, SQLT_INT);
         
         if (!oci_execute($stid)) {
             $error = oci_error($stid);
@@ -98,21 +61,12 @@ if (!isset($cart_id)) {
 }
 
 // Now fetch cart items with stock information
-if (isset($_SESSION['user_id'])) {
-    $itemsQuery = "
-    SELECT p.product_id, p.product_name, p.product_image, p.price, p.stock, pc.quantity
-    FROM product_cart pc
-    JOIN product p ON pc.product_id = p.product_id
-    WHERE pc.cart_id = :cart_id
-    ";
-} else {
-    $itemsQuery = "
-    SELECT p.product_id, p.product_name, p.product_image, p.price, p.stock, pc.quantity
-    FROM guest_product_cart pc
-    JOIN product p ON pc.product_id = p.product_id
-    WHERE pc.cart_id = :cart_id
-    ";
-}
+$itemsQuery = "
+SELECT p.product_id, p.product_name, p.product_image, p.price, p.stock, pc.quantity
+FROM product_cart pc
+JOIN product p ON pc.product_id = p.product_id
+WHERE pc.cart_id = :cart_id
+";
 
 $stid = oci_parse($conn, $itemsQuery);
 oci_bind_by_name($stid, ":cart_id", $cart_id);
@@ -131,6 +85,79 @@ if (oci_execute($stid)) {
 // Debug: Output cart items
 error_log("Cart items: " . print_r($cart_items, true));
 error_log("===== END DEBUG =====");
+
+// Get available collection slots
+error_log("===== COLLECTION SLOT DEBUG =====");
+error_log("Database connection status: " . ($conn ? "Connected" : "Not connected"));
+
+// First, let's check if we have any data at all
+$check_sql = "SELECT COUNT(*) as total FROM collection_slot";
+$check_stmt = oci_parse($conn, $check_sql);
+if (oci_execute($check_stmt)) {
+    $count_row = oci_fetch_assoc($check_stmt);
+    error_log("Total slots in database: " . $count_row['TOTAL']);
+}
+
+// Now get all slots without any filters
+//$sql = "SELECT collection_slot_id, 
+//        TO_CHAR(slot_date, 'Day, Mon DD') as formatted_date,
+//        slot_time as time_slot,
+//        slot_date,
+//        slot_day
+//        FROM collection_slot 
+//        ORDER BY slot_date, slot_time";
+
+// Only get the next 6 available slots more than 24 hours from now
+$sql = "SELECT * FROM (
+    SELECT cs.collection_slot_id, 
+           TO_CHAR(cs.slot_date, 'Day, Mon DD') AS formatted_date,
+           TO_CHAR(cs.slot_time, 'HH:MI AM') AS time_slot,
+           cs.slot_date,
+           cs.slot_day,
+           TO_CHAR(cs.slot_date, 'D') as day_number,
+           COUNT(o.order_id) as order_count
+    FROM collection_slot cs
+    LEFT JOIN orders o ON cs.collection_slot_id = o.collection_slot_id
+    WHERE cs.slot_time > SYSTIMESTAMP + INTERVAL '1' DAY
+    AND cs.slot_day IN ('Wednesday', 'Thursday', 'Friday')
+    GROUP BY cs.collection_slot_id, cs.slot_date, cs.slot_time, cs.slot_day
+    HAVING COUNT(o.order_id) < 20
+    ORDER BY cs.slot_date, cs.slot_time
+)
+WHERE ROWNUM <= 9";
+
+error_log("SQL Query: " . $sql);
+
+$stmt = oci_parse($conn, $sql);
+if (!$stmt) {
+    $error = oci_error($conn);
+    error_log("Error parsing SQL: " . $error['message']);
+    echo "<!-- Error parsing SQL: " . $error['message'] . " -->";
+}
+
+if (!oci_execute($stmt)) {
+    $error = oci_error($stmt);
+    error_log("Error executing SQL: " . $error['message']);
+    echo "<!-- Error executing SQL: " . $error['message'] . " -->";
+}
+
+$slots = [];
+while ($row = oci_fetch_assoc($stmt)) {
+    // Format the date to remove extra spaces
+    $row['FORMATTED_DATE'] = trim($row['FORMATTED_DATE']);
+    $slots[] = $row;
+    error_log("Found slot: " . print_r($row, true));
+    error_log("Day number: " . $row['DAY_NUMBER']); // 1=Sunday, 2=Monday, etc.
+}
+
+error_log("Total slots found: " . count($slots));
+error_log("===== END COLLECTION SLOT DEBUG =====");
+
+// Debug output in HTML
+echo "<!-- Debug: Found " . count($slots) . " slots -->";
+foreach ($slots as $slot) {
+    echo "<!-- Slot: " . print_r($slot, true) . " -->";
+}
 ?>
 
 <!DOCTYPE html>
@@ -140,272 +167,51 @@ error_log("===== END DEBUG =====");
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shopping Cart</title>
-    <style>
-        /* Reset & basic styles */
-        /* Cart Container */
-        .cart-container {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 30px;
-          max-width: 1200px;
-          margin: 40px auto;
-          background: #fff;
-          padding: 30px;
-          border-radius: 10px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-        }
-
-        .cart-left {
-        flex: 2;
-        min-width: 650px;
-        }
-
-        .cart-right {
-        flex: 1;
-        min-width: 280px;
-        }
-
-        /* Table Styles */
-        .cart-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-        }
-
-        .cart-table th, .cart-table td {
-        padding: 15px;
-        text-align: left;
-        border-bottom: 1px solid #eee;
-        }
-
-        .cart-table th {
-        background-color: #f8f8f8;
-        font-weight: 600;
-        color: #333;
-        }
-
-        .product-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        }
-
-        .product-info img {
-        width: 50px;
-        height: 50px;
-        object-fit: cover;
-        border-radius: 6px;
-        }
-
-        /* Quantity Controls */
-        .qty-controls {
-        display: flex;
-        align-items: center;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        overflow: hidden;
-        }
-
-        .qty-controls button {
-        padding: 6px 6px;
-        background: #eee;
-        border: none;
-        font-size: 16px;
-        cursor: pointer;
-        }
-
-        .qty-controls input {
-        width: 30px;
-        text-align: center;
-        border: none;
-        background: #f8f8f8;
-        }
-
-        /* Buttons */
-        .btn {
-        background-color: #4CAF50;
-        color: #fff;
-        padding: 10px 18px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 500;
-        text-align: center;
-        display: inline-block;
-        transition: 0.3s ease;
-        }
-
-        .btn:hover {
-        background-color: #43a047;
-        }
-
-        .btn.grey {
-        background-color: #ccc;
-        color: #000;
-        }
-
-        .btn.green {
-        background-color: #00c853;
-        }
-
-        .btn.full {
-        display: block;
-        width: 100%;
-        margin-top: 20px;
-        }
-
-        /* Actions Section */
-        .cart-actions {
-        margin: 20px 0;
-        display: flex;
-        gap: 10px;
-        }
-
-       
-
-        /* Payment Methods */
-        .payment-methods {
-        margin-top: 20px;
-        }
-
-        .payment-methods p {
-        margin-bottom: 10px;
-        font-weight: 500;
-        }
-
-        .payment-methods img {
-        width: 100px;
-        margin-right: 10px;
-        }
-
-        /* Pickup Time */
-        .pickup-time {
-        background: #f9f9f9;
-        padding: 20px;
-        border-radius: 10px;
-        }
-
-        .pickup-time h3 {
-        margin-bottom: 10px;
-        }
-
-        .pickup-time .days,
-        .pickup-time .slots {
-        display: flex;
-        gap: 10px;
-        margin: 10px 0;
-        }
-
-        .pickup-time button {
-        padding: 10px 14px;
-        border-radius: 6px;
-        border: 1px solid #ddd;
-        background: #fff;
-        cursor: pointer;
-        transition: 0.2s ease;
-        }
-
-        .pickup-time button.active,
-        .pickup-time button:hover {
-        background-color: #00c853;
-        color: #fff;
-        border-color: #00c853;
-        }
-
-        /* Totals */
-        .total-section {
-        background: #f9f9f9;
-        padding: 20px;
-        margin-top: 20px;
-        border-radius: 10px;
-        }
-
-        .total-section p {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 10px;
-        font-size: 1rem;
-        }
-
-        .btn.red {
-        background-color: #e53935;
-        }
-
-        .btn.red:hover {
-        background-color: #c62828;
-        }
-
-        .cart-table td {
-        vertical-align: middle;
-        }
-
-        .empty {
-        text-align: center;
-        padding: 20px;
-        font-style: italic;
-        color: #777;
-        }
-        
-        .stock-info {
-            font-size: 0.8rem;
-            color: #666;
-            margin-top: 5px;
-        }
-
-        .slot-selection {
-            margin-top: 15px;
-        }
-
-        .date-selection, .time-selection {
-            margin-bottom: 15px;
-        }
-
-        .date-selection h4, .time-selection h4 {
-            margin-bottom: 10px;
-            font-size: 14px;
-            color: #666;
-        }
-
-        .date-buttons, .time-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .date-buttons button, .time-buttons button {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: #fff;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .date-buttons button:hover, .time-buttons button:hover {
-            border-color: #4CAF50;
-            color: #4CAF50;
-        }
-
-        .date-buttons button.active, .time-buttons button.active {
-            background: #4CAF50;
-            color: #fff;
-            border-color: #4CAF50;
-        }
-
-        .slot-info {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 15px;
-        }
-
-        .slot-warning {
-            font-size: 14px;
-            color: #e53935;
-            margin-top: 10px;
-        }
-    </style>
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/cart.css">
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Footer.css">
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Header.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        .collection-slot-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .collection-slot-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.2em;
+        }
+        
+        .collection-slot-section select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+            background-color: white;
+        }
+        
+        .collection-slot-section select optgroup {
+            font-weight: bold;
+            color: #2c3e50;
+            padding: 8px 0;
+        }
+        
+        .collection-slot-section select option {
+            padding: 8px;
+            color: #555;
+        }
+        
+        .slot-info {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+    </style>
 </head>
 <body>
 <header>
@@ -477,21 +283,38 @@ error_log("===== END DEBUG =====");
       <div class="pickup-time">
         <h3>Collection Slot</h3>
         <p class="slot-info">Please select a collection slot at least 24 hours in advance.</p>
-        <div class="slot-selection">
-            <div class="date-selection">
-                <h4>Select Date</h4>
-                <div class="date-buttons" id="dateButtons">
-                    <!-- Dates will be populated by JavaScript -->
-                </div>
-            </div>
-            <div class="time-selection">
-                <h4>Select Time</h4>
-                <div class="time-buttons" id="timeButtons">
-                    <!-- Time slots will be populated by JavaScript -->
-                </div>
-            </div>
-            <input type="hidden" id="selectedSlotId" name="slot_id" value="">
-            <p class="slot-warning" style="display: none; color: #e53935; margin-top: 10px;"></p>
+        <div class="collection-slot-section">
+            <h3>Select Collection Slot</h3>
+            <select id="collection-slot" name="collection_slot_id" class="form-control" required>
+                <option value="">Select a collection slot</option>
+                <?php 
+                $currentDay = '';
+                foreach ($slots as $slot) {
+                    $formatted_date = trim($slot['FORMATTED_DATE']);
+                    $day = date('l', strtotime($slot['SLOT_DATE']));
+                    
+                    if ($day !== $currentDay) {
+                        if ($currentDay !== '') {
+                            echo '</optgroup>';
+                        }
+                        echo '<optgroup label="' . $day . '">';
+                        $currentDay = $day;
+                    }
+                    
+                    $orderCount = $slot['ORDER_COUNT'];
+                    $isAvailable = $orderCount < 20;
+                    
+                    echo "<option value='" . $slot['COLLECTION_SLOT_ID'] . "' " . 
+                         (!$isAvailable ? 'disabled' : '') . ">" . 
+                         $formatted_date . " at " . $slot['TIME_SLOT'] . 
+                         ($isAvailable ? " (" . (20 - $orderCount) . " slots remaining)" : " - Slot Full") . 
+                         "</option>";
+                }
+                if ($currentDay !== '') {
+                    echo '</optgroup>';
+                }
+                ?>
+            </select>
         </div>
       </div>
 
@@ -505,6 +328,8 @@ error_log("===== END DEBUG =====");
 </section>
 
 <?php include '../../Includes/footer.php'; ?>
+
+
 
 <script>
 function updateQuantity(productId, change, button) {
@@ -656,106 +481,35 @@ function clearCart() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const dateButtons = document.getElementById('dateButtons');
-    const timeButtons = document.getElementById('timeButtons');
-    const selectedSlotId = document.getElementById('selectedSlotId');
+    const collectionSlot = document.getElementById('collection-slot');
     const checkoutBtn = document.getElementById('checkoutBtn');
-    const slotWarning = document.querySelector('.slot-warning');
     
-    // Fetch available slots
-    fetch('collection_slot.php?action=get_slots')
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => {
-                    throw new Error(err.error || 'Failed to fetch collection slots');
-                });
-            }
-            return response.json();
-        })
-        .then(response => {
-            if (!response.success) {
-                throw new Error(response.error || 'Failed to fetch collection slots');
-            }
-            
-            const slots = response.data;
-            if (!Array.isArray(slots) || slots.length === 0) {
-                slotWarning.textContent = 'No collection slots available at this time.';
-                slotWarning.style.display = 'block';
-                checkoutBtn.disabled = true;
-                return;
-            }
-            
-            // Group slots by date
-            const slotsByDate = {};
-            slots.forEach(slot => {
-                if (!slotsByDate[slot.date]) {
-                    slotsByDate[slot.date] = [];
-                }
-                slotsByDate[slot.date].push(slot);
-            });
-            
-            // Create date buttons
-            Object.keys(slotsByDate).sort().forEach(date => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.textContent = formatDate(date);
-                button.dataset.date = date;
-                button.addEventListener('click', () => selectDate(date, slotsByDate[date]));
-                dateButtons.appendChild(button);
-            });
-        })
-        .catch(error => {
-            console.error('Error fetching slots:', error);
-            slotWarning.textContent = error.message || 'Error loading collection slots. Please try again.';
-            slotWarning.style.display = 'block';
-            checkoutBtn.disabled = true;
-        });
-    
-    function selectDate(date, slots) {
-        // Update date buttons
-        dateButtons.querySelectorAll('button').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.date === date);
-        });
+    checkoutBtn.addEventListener('click', function(e) {
+        e.preventDefault(); // Prevent default form submission
         
-        // Clear and update time buttons
-        timeButtons.innerHTML = '';
-        slots.forEach(slot => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = `${slot.time_slot} - ${getEndTime(slot.time_slot)}`;
-            button.dataset.slotId = slot.slot_id;
-            button.addEventListener('click', () => selectTimeSlot(slot));
-            timeButtons.appendChild(button);
-        });
-    }
-    
-    function getEndTime(startTime) {
-        const [hours, minutes] = startTime.split(':');
-        const endTime = new Date();
-        endTime.setHours(parseInt(hours) + 3, parseInt(minutes), 0);
-        return endTime.toTimeString().slice(0, 5);
-    }
-    
-    function formatDate(dateStr) {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    }
-    
-    function selectTimeSlot(slot) {
-        // Update time buttons
-        timeButtons.querySelectorAll('button').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.slotId === slot.slot_id);
-        });
+        const selectedSlot = collectionSlot.value;
+        console.log('Selected collection slot:', selectedSlot);
         
-        // Update hidden input and enable checkout
-        selectedSlotId.value = slot.slot_id;
-        checkoutBtn.disabled = false;
-        slotWarning.style.display = 'none';
-    }
-    
-    // Update checkout button click handler
-    checkoutBtn.addEventListener('click', function() {
-        window.location.href = 'checkout.php';
+        if (!selectedSlot) {
+            alert('Please select a collection slot before proceeding to checkout.');
+            return;
+        }
+        
+        // Create a form and submit it
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/E-commerce/frontend/Includes/cart/checkout.php';
+        
+        const slotInput = document.createElement('input');
+        slotInput.type = 'hidden';
+        slotInput.name = 'collection_slot_id';
+        slotInput.value = selectedSlot;
+        
+        form.appendChild(slotInput);
+        document.body.appendChild(form);
+        
+        console.log('Submitting form with collection_slot_id:', selectedSlot);
+        form.submit();
     });
 });
 </script>

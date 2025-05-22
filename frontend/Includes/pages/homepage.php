@@ -11,6 +11,8 @@
     <title>FRESGRUB</title>
     <link rel="stylesheet" href="../../assets/CSS/Homepage.css">
     <link rel="stylesheet" href="../../assets/CSS/Product-card.css">
+    <link rel="stylesheet" href="../../assets/CSS/Header.css">
+    <link rel="stylesheet" href="../../assets/CSS/Footer.css">
 </head>
 <body>
     <header>

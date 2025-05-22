@@ -87,37 +87,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['email']) && isset($_PO
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reset Password - FresGrub</title>
     <link rel="stylesheet" href="../../assets/CSS/LoginPage.css">
-    <style>
-        .message {
-            margin: 20px 0;
-            padding: 10px;
-            border-radius: 4px;
-        }
-        
-        .success {
-            background-color: #dff0d8;
-            color: #3c763d;
-        }
-        
-        .error {
-            background-color: #f2dede;
-            color: #a94442;
-        }
-        
-        .password-container {
-            position: relative;
-        }
-        
-        .password-toggle {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-            color: #4CAF50;
-            font-size: 0.8em;
-        }
-    </style>
+    <link rel="stylesheet" href="../../assets/CSS/reset_password.css">
 </head>
 <body>
     <div class="container">

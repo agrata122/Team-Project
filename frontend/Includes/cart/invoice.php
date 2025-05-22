@@ -1,6 +1,11 @@
 <?php
 session_start();
 require 'C:\xampp\htdocs\E-commerce\backend\connect.php';
+require 'C:\xampp\htdocs\E-commerce\vendor\autoload.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
 
 if (!isset($_GET['order_id'])) {
     header("Location: shopping_cart.php");
@@ -16,35 +21,127 @@ $order_id = $_GET['order_id'];
 
 // Get order details
 $orderQuery = "SELECT o.*, u.full_name, u.email, u.contact_no, 
-              c.coupon_code, c.coupon_discount_percent
+              c.coupon_code, c.coupon_discount_percent,
+              cs.slot_date, cs.slot_time, cs.slot_day
               FROM orders o
               JOIN users u ON o.user_id = u.user_id
               LEFT JOIN coupon c ON o.coupon_id = c.coupon_id
+              LEFT JOIN collection_slot cs ON o.collection_slot_id = cs.collection_slot_id
               WHERE o.order_id = :order_id";
 $stid = oci_parse($conn, $orderQuery);
 oci_bind_by_name($stid, ":order_id", $order_id);
 oci_execute($stid);
 $order = oci_fetch_assoc($stid);
 
-// Get order items
-$itemsQuery = "SELECT p.product_name, p.price, pc.quantity, 
+// Debug: Check if order exists
+if (!$order) {
+    echo "No order found with ID: $order_id";
+    exit();
+}
+
+// Function to send invoice email
+function sendInvoiceEmail($to, $order_id, $order) {
+    $mail = new PHPMailer(true);
+    
+    try {
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host = 'smtp.gmail.com';
+        $mail->SMTPAuth = true;
+        $mail->Username = 'agratab2003@gmail.com';
+        $mail->Password = 'lfrt mlro alke cbgm';
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port = 587;
+
+        // Recipients
+        $mail->setFrom('agratab2003@gmail.com', 'FresGrub');
+        $mail->addAddress($to, $order['FULL_NAME']);
+
+        // Content
+        $mail->isHTML(true);
+        $mail->Subject = "Invoice for Order #$order_id";
+        
+        // Get order items
+        global $conn;
+        $itemsQuery = "SELECT p.product_name, oi.price, oi.quantity, 
+                      s.shop_name, s.shop_category
+                      FROM order_items oi
+                      JOIN product p ON oi.product_id = p.product_id
+                      JOIN shops s ON p.shop_id = s.shop_id
+                      WHERE oi.order_id = :order_id";
+        $stid = oci_parse($conn, $itemsQuery);
+        oci_bind_by_name($stid, ":order_id", $order_id);
+        oci_execute($stid);
+        
+        $items = [];
+        $total = 0;
+        
+        while ($row = oci_fetch_assoc($stid)) {
+            $items[] = $row;
+            $total += $row['PRICE'] * $row['QUANTITY'];
+        }
+        
+        // Get the HTML content of the invoice
+        ob_start();
+        include 'invoice_template.php';
+        $mail->Body = ob_get_clean();
+        
+        // Plain text version
+        $mail->AltBody = "Thank you for your order #$order_id. Please find your invoice attached.";
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log("Email sending failed: {$mail->ErrorInfo}");
+        return false;
+    }
+}
+
+// Send invoice email to customer
+if (isset($order['EMAIL'])) {
+    $emailSent = sendInvoiceEmail($order['EMAIL'], $order_id, $order);
+    if (!$emailSent) {
+        error_log("Failed to send invoice email to: " . $order['EMAIL']);
+    }
+}
+
+// Get order items - Modified query for debugging
+$itemsQuery = "SELECT p.product_name, oi.price, oi.quantity, 
               s.shop_name, s.shop_category
-              FROM product_cart pc
-              JOIN product p ON pc.product_id = p.product_id
+              FROM order_items oi
+              JOIN product p ON oi.product_id = p.product_id
               JOIN shops s ON p.shop_id = s.shop_id
-              JOIN cart ct ON pc.cart_id = ct.cart_id
-              JOIN orders o ON ct.cart_id = o.cart_id
-              WHERE o.order_id = :order_id";
+              WHERE oi.order_id = :order_id";
 $stid = oci_parse($conn, $itemsQuery);
 oci_bind_by_name($stid, ":order_id", $order_id);
-oci_execute($stid);
+$result = oci_execute($stid);
+
+// Debug: Check query execution
+if (!$result) {
+    $e = oci_error($stid);
+    echo "Error executing items query: " . $e['message'];
+    exit();
+}
 
 $items = [];
 $total = 0;
 
+// Debug: Let's check what rows are returned
+$row_count = 0;
 while ($row = oci_fetch_assoc($stid)) {
+    $row_count++;
     $items[] = $row;
     $total += $row['PRICE'] * $row['QUANTITY'];
+    
+    // Debug: Print the first row to see its structure
+    if ($row_count == 1) {
+        echo "<!-- Debug: First row keys: " . implode(', ', array_keys($row)) . " -->";
+    }
+}
+
+// Debug: If no items found, show message
+if (count($items) == 0) {
+    echo "<!-- No items found for this order -->";
 }
 
 // Get payment details
@@ -53,6 +150,7 @@ $stid = oci_parse($conn, $paymentQuery);
 oci_bind_by_name($stid, ":order_id", $order_id);
 oci_execute($stid);
 $payment = oci_fetch_assoc($stid);
+
 ?>
 
 <!DOCTYPE html>
@@ -154,7 +252,8 @@ $payment = oci_fetch_assoc($stid);
     <div class="invoice-header">
         <h1 class="invoice-title">INVOICE</h1>
         <div class="invoice-number">Order #<?php echo $order_id; ?></div>
-        <div class="invoice-date">Date: <?php echo date('F j, Y', strtotime($order['ORDER_DATE'])); ?></div>
+        <div class="invoice-date">Order Date: <?php echo date('F j, Y'); ?></div>
+        
     </div>
     
     <div class="row">
@@ -178,6 +277,18 @@ $payment = oci_fetch_assoc($stid);
     </div>
     
     <div class="invoice-section">
+        <h3 class="section-title">Collection Details</h3>
+        <?php if ($order['SLOT_DATE'] && $order['SLOT_TIME']): ?>
+            <p>Your collection slot is scheduled for:</p>
+            <p><strong>Date:</strong> <?php echo date('F j, Y', strtotime($order['SLOT_DATE'])); ?></p>
+            <p><strong>Time:</strong> <?php echo date('g:i A', strtotime($order['SLOT_TIME'])); ?></p>
+            <p><strong>Day:</strong> <?php echo $order['SLOT_DAY']; ?></p>
+        <?php else: ?>
+            <p>No collection slot has been assigned for this order.</p>
+        <?php endif; ?>
+    </div>
+    
+    <div class="invoice-section">
         <h3 class="section-title">Order Summary</h3>
         <table>
             <thead>
@@ -190,15 +301,21 @@ $payment = oci_fetch_assoc($stid);
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($items as $item): ?>
-                <tr>
-                    <td><?php echo htmlspecialchars($item['PRODUCT_NAME']); ?></td>
-                    <td><?php echo htmlspecialchars($item['SHOP_NAME']); ?></td>
-                    <td>$<?php echo number_format($item['PRICE'], 2); ?></td>
-                    <td><?php echo $item['QUANTITY']; ?></td>
-                    <td class="text-right">$<?php echo number_format($item['PRICE'] * $item['QUANTITY'], 2); ?></td>
-                </tr>
-                <?php endforeach; ?>
+                <?php if (count($items) > 0): ?>
+                    <?php foreach ($items as $item): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($item['PRODUCT_NAME']); ?></td>
+                        <td><?php echo htmlspecialchars($item['SHOP_NAME']); ?></td>
+                        <td>$<?php echo number_format($item['PRICE'], 2); ?></td>
+                        <td><?php echo $item['QUANTITY']; ?></td>
+                        <td class="text-right">$<?php echo number_format($item['PRICE'] * $item['QUANTITY'], 2); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="5">No items found for this order</td>
+                    </tr>
+                <?php endif; ?>
             </tbody>
             <tfoot>
                 <tr>
