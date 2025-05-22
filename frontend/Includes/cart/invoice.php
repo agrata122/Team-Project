@@ -1,6 +1,11 @@
 <?php
 session_start();
 require 'C:\xampp\htdocs\E-commerce\backend\connect.php';
+require 'C:\xampp\htdocs\E-commerce\vendor\autoload.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
 
 if (!isset($_GET['order_id'])) {
     header("Location: shopping_cart.php");
@@ -32,6 +37,72 @@ $order = oci_fetch_assoc($stid);
 if (!$order) {
     echo "No order found with ID: $order_id";
     exit();
+}
+
+// Function to send invoice email
+function sendInvoiceEmail($to, $order_id, $order) {
+    $mail = new PHPMailer(true);
+    
+    try {
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host = 'smtp.gmail.com';
+        $mail->SMTPAuth = true;
+        $mail->Username = 'agratab2003@gmail.com';
+        $mail->Password = 'lfrt mlro alke cbgm';
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port = 587;
+
+        // Recipients
+        $mail->setFrom('agratab2003@gmail.com', 'FresGrub');
+        $mail->addAddress($to, $order['FULL_NAME']);
+
+        // Content
+        $mail->isHTML(true);
+        $mail->Subject = "Invoice for Order #$order_id";
+        
+        // Get order items
+        global $conn;
+        $itemsQuery = "SELECT p.product_name, oi.price, oi.quantity, 
+                      s.shop_name, s.shop_category
+                      FROM order_items oi
+                      JOIN product p ON oi.product_id = p.product_id
+                      JOIN shops s ON p.shop_id = s.shop_id
+                      WHERE oi.order_id = :order_id";
+        $stid = oci_parse($conn, $itemsQuery);
+        oci_bind_by_name($stid, ":order_id", $order_id);
+        oci_execute($stid);
+        
+        $items = [];
+        $total = 0;
+        
+        while ($row = oci_fetch_assoc($stid)) {
+            $items[] = $row;
+            $total += $row['PRICE'] * $row['QUANTITY'];
+        }
+        
+        // Get the HTML content of the invoice
+        ob_start();
+        include 'invoice_template.php';
+        $mail->Body = ob_get_clean();
+        
+        // Plain text version
+        $mail->AltBody = "Thank you for your order #$order_id. Please find your invoice attached.";
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log("Email sending failed: {$mail->ErrorInfo}");
+        return false;
+    }
+}
+
+// Send invoice email to customer
+if (isset($order['EMAIL'])) {
+    $emailSent = sendInvoiceEmail($order['EMAIL'], $order_id, $order);
+    if (!$emailSent) {
+        error_log("Failed to send invoice email to: " . $order['EMAIL']);
+    }
 }
 
 // Get order items - Modified query for debugging
@@ -181,7 +252,8 @@ $payment = oci_fetch_assoc($stid);
     <div class="invoice-header">
         <h1 class="invoice-title">INVOICE</h1>
         <div class="invoice-number">Order #<?php echo $order_id; ?></div>
-        <div class="invoice-date">Date: <?php echo date('F j, Y', strtotime($order['ORDER_DATE'])); ?></div>
+        <div class="invoice-date">Order Date: <?php echo date('F j, Y'); ?></div>
+        
     </div>
     
     <div class="row">

@@ -17,7 +17,7 @@ error_log("===== CART PAGE DEBUG =====");
 error_log("SESSION: " . print_r($_SESSION, true));
 error_log("COOKIES: " . print_r($_COOKIE, true));
 
-// Handle user ID - prioritize logged-in user over cookie
+// Handle user ID - only for logged-in users
 if (isset($_SESSION['user_id'])) {
     $user_id = $_SESSION['user_id'];
     error_log("Using user_id from SESSION: " . $user_id);
@@ -26,34 +26,8 @@ if (isset($_SESSION['user_id'])) {
     $cartQuery = "SELECT cart_id FROM cart WHERE user_id = :user_id";
     $stid = oci_parse($conn, $cartQuery);
     oci_bind_by_name($stid, ":user_id", $user_id);
-} elseif (isset($_COOKIE['guest_id'])) {
-    $user_id = $_COOKIE['guest_id'];
-    error_log("Using guest_id from COOKIE: " . $user_id);
-    
-    // Get cart for guest user
-    $cartQuery = "SELECT cart_id FROM guest_cart WHERE guest_id = :guest_id";
-    $stid = oci_parse($conn, $cartQuery);
-    oci_bind_by_name($stid, ":guest_id", $user_id, -1, SQLT_CHR);
 } else {
-    $user_id = 'guest_' . uniqid();
-    setcookie('guest_id', $user_id, time() + 60 * 60 * 24 * 30, "/");
-    error_log("Generated new guest_id: " . $user_id);
-    
-    // Create new guest cart
-    $createCartQuery = "INSERT INTO guest_cart (guest_id, add_date) VALUES (:guest_id, SYSDATE) RETURNING cart_id INTO :new_cart_id";
-    $stid = oci_parse($conn, $createCartQuery);
-    $new_cart_id = null;
-    oci_bind_by_name($stid, ":guest_id", $user_id, -1, SQLT_CHR);
-    oci_bind_by_name($stid, ":new_cart_id", $new_cart_id, 32, SQLT_INT);
-    
-    if (!oci_execute($stid)) {
-        $error = oci_error($stid);
-        error_log("Guest cart creation error: " . $error['message']);
-        die("Error creating your cart. Please try again.");
-    }
-    
-    $cart_id = $new_cart_id;
-    error_log("Created new guest cart with cart_id: " . $cart_id);
+    die("Please log in to access your cart");
 }
 
 if (!isset($cart_id)) {
@@ -68,21 +42,12 @@ if (!isset($cart_id)) {
         $cart_id = $cartRow['CART_ID'];
         error_log("Found existing cart_id: " . $cart_id);
     } else {
-        if (isset($_SESSION['user_id'])) {
-            // Create new cart for logged-in user
-            $createCartQuery = "INSERT INTO cart (user_id, add_date) VALUES (:user_id, SYSDATE) RETURNING cart_id INTO :new_cart_id";
-            $stid = oci_parse($conn, $createCartQuery);
-            $new_cart_id = null;
-            oci_bind_by_name($stid, ":user_id", $user_id);
-            oci_bind_by_name($stid, ":new_cart_id", $new_cart_id, 32, SQLT_INT);
-        } else {
-            // Create new guest cart
-            $createCartQuery = "INSERT INTO guest_cart (guest_id, add_date) VALUES (:guest_id, SYSDATE) RETURNING cart_id INTO :new_cart_id";
-            $stid = oci_parse($conn, $createCartQuery);
-            $new_cart_id = null;
-            oci_bind_by_name($stid, ":guest_id", $user_id, -1, SQLT_CHR);
-            oci_bind_by_name($stid, ":new_cart_id", $new_cart_id, 32, SQLT_INT);
-        }
+        // Create new cart for logged-in user
+        $createCartQuery = "INSERT INTO cart (user_id, add_date) VALUES (:user_id, SYSDATE) RETURNING cart_id INTO :new_cart_id";
+        $stid = oci_parse($conn, $createCartQuery);
+        $new_cart_id = null;
+        oci_bind_by_name($stid, ":user_id", $user_id);
+        oci_bind_by_name($stid, ":new_cart_id", $new_cart_id, 32, SQLT_INT);
         
         if (!oci_execute($stid)) {
             $error = oci_error($stid);
@@ -96,21 +61,12 @@ if (!isset($cart_id)) {
 }
 
 // Now fetch cart items with stock information
-if (isset($_SESSION['user_id'])) {
-    $itemsQuery = "
-    SELECT p.product_id, p.product_name, p.product_image, p.price, p.stock, pc.quantity
-    FROM product_cart pc
-    JOIN product p ON pc.product_id = p.product_id
-    WHERE pc.cart_id = :cart_id
-    ";
-} else {
-    $itemsQuery = "
-    SELECT p.product_id, p.product_name, p.product_image, p.price, p.stock, pc.quantity
-    FROM guest_product_cart pc
-    JOIN product p ON pc.product_id = p.product_id
-    WHERE pc.cart_id = :cart_id
-    ";
-}
+$itemsQuery = "
+SELECT p.product_id, p.product_name, p.product_image, p.price, p.stock, pc.quantity
+FROM product_cart pc
+JOIN product p ON pc.product_id = p.product_id
+WHERE pc.cart_id = :cart_id
+";
 
 $stid = oci_parse($conn, $itemsQuery);
 oci_bind_by_name($stid, ":cart_id", $cart_id);
