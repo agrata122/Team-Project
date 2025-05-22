@@ -7,7 +7,12 @@ function executeQuery($conn, $sql)
     $stmt = oci_parse($conn, $sql);
     if (!oci_execute($stmt)) {
         $e = oci_error($stmt);
-        echo "<p style='color:red;'>Error: {$e['message']}</p>";
+        // Check if error is due to object already existing
+        if ($e['code'] == 955) { // ORA-00955: name is already used by an existing object
+            echo "<p style='color:orange;'>Object already exists, skipping: $sql</p>";
+        } else {
+            echo "<p style='color:red;'>Error: {$e['message']}</p>";
+        }
     } else {
         echo "<p style='color:green;'>Successfully executed: $sql</p>";
     }
@@ -18,17 +23,17 @@ function safeDrop($conn, $sql)
 {
     $stmt = oci_parse($conn, $sql);
     if(@oci_execute($stmt)) {
-        echo "<p style='color:green;'>Successfully executed: $sql</p>";
+        echo "<p style='color:green;'>Successfully dropped: $sql</p>";
     } else {
         $e = oci_error($stmt);
         if ($e['code'] != 942) { // ORA-00942: table or view does not exist
-            echo "<p style='color:red;'>Error: {$e['message']}</p>";
+            echo "<p style='color:red;'>Error dropping object: {$e['message']}</p>";
         }
-    } // Suppress errors if they don't exist
+    }
     oci_free_statement($stmt);
 }
 
-// Drop tables in reverse order of dependencies
+// Drop all objects in reverse order of dependencies
 safeDrop($conn, "DROP TRIGGER trg_users_pk");
 safeDrop($conn, "DROP SEQUENCE user_seq");
 safeDrop($conn, "DROP TABLE wishlist_product CASCADE CONSTRAINTS");
@@ -68,6 +73,9 @@ safeDrop($conn, "DROP TRIGGER trg_cart_pk");
 safeDrop($conn, "DROP SEQUENCE cart_seq");
 safeDrop($conn, "DROP TABLE cart CASCADE CONSTRAINTS");
 safeDrop($conn, "DROP TABLE users CASCADE CONSTRAINTS");
+safeDrop($conn, "DROP TABLE order_items CASCADE CONSTRAINTS");
+safeDrop($conn, "DROP SEQUENCE order_items_seq");
+//safeDrop($conn, "DROP TRIGGER trg_order_items_pk");
 
 // Reorder the table creation sequence
 if ($conn) {
@@ -216,7 +224,7 @@ if ($conn) {
             collection_slot_id NUMBER PRIMARY KEY,
             slot_date DATE,
             slot_day VARCHAR2(10),
-            slot_time DATE NOT NULL,
+            slot_time TIMESTAMP NOT NULL,
             total_order NUMBER
         )
     ");
@@ -278,6 +286,28 @@ if ($conn) {
         FOR EACH ROW
         BEGIN
             SELECT orders_seq.NEXTVAL INTO :new.order_id FROM dual;
+        END;
+    ");
+
+    // ORDER_ITEMS TABLE
+    executeQuery($conn, "
+        CREATE TABLE order_items (
+            order_item_id NUMBER PRIMARY KEY,
+            order_id NUMBER NOT NULL,
+            product_id NUMBER NOT NULL,
+            quantity NUMBER NOT NULL,
+            price NUMBER NOT NULL,
+            CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(order_id),
+            CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES product(product_id)
+        )
+    ");
+    executeQuery($conn, "CREATE SEQUENCE order_items_seq START WITH 1 INCREMENT BY 1");
+    executeQuery($conn, "
+        CREATE OR REPLACE TRIGGER trg_order_items_pk
+        BEFORE INSERT ON order_items
+        FOR EACH ROW
+        BEGIN
+            SELECT order_items_seq.NEXTVAL INTO :new.order_item_id FROM dual;
         END;
     ");
 
@@ -689,21 +719,41 @@ foreach ($product_carts as $pc) {
 
 //INSERT DATA FOR COLLECTION SLOT
 $collectionSlots = [
-    ['slot_date' => '2024-06-15', 'slot_day' => 'Thursday', 'slot_time' => '10:00:00', 'total_order' => 15],
-    ['slot_date' => '2024-06-15', 'slot_day' => 'Wednesday', 'slot_time' => '12:00:00', 'total_order' => 20],
-    ['slot_date' => '2024-06-16', 'slot_day' => 'Friday', 'slot_time' => '11:00:00', 'total_order' => 15],
-    ['slot_date' => '2024-06-17', 'slot_day' => 'Wednesday', 'slot_time' => '14:00:00', 'total_order' => 18],
-    ['slot_date' => '2025-05-21', 'slot_day' => 'Wednesday', 'slot_time' => '15:00:00', 'total_order' => 15],
-    ['slot_date' => '2025-05-22', 'slot_day' => 'Thursday', 'slot_time' => '15:00:00', 'total_order' => 15],
-    ['slot_date' => '2025-05-23', 'slot_day' => 'Friday', 'slot_time' => '15:00:00', 'total_order' => 15],
-    ['slot_date' => '2025-05-28', 'slot_day' => 'Wednesday', 'slot_time' => '15:00:00', 'total_order' => 15],
-    ['slot_date' => '2025-05-29', 'slot_day' => 'Thi', 'slot_time' => '15:00:00', 'total_order' => 15]
+    // Week 1
+    ['slot_date' => '2025-05-22', 'slot_day' => 'Thursday', 'slot_time' => '2025-05-22 10:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-22', 'slot_day' => 'Thursday', 'slot_time' => '2025-05-22 13:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-22', 'slot_day' => 'Thursday', 'slot_time' => '2025-05-22 16:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-23', 'slot_day' => 'Friday', 'slot_time' => '2025-05-23 10:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-23', 'slot_day' => 'Friday', 'slot_time' => '2025-05-23 13:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-23', 'slot_day' => 'Friday', 'slot_time' => '2025-05-23 16:00:00', 'total_order' => 20],
+    
+    // Week 2
+    ['slot_date' => '2025-05-28', 'slot_day' => 'Wednesday', 'slot_time' => '2025-05-28 10:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-28', 'slot_day' => 'Wednesday', 'slot_time' => '2025-05-28 13:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-28', 'slot_day' => 'Wednesday', 'slot_time' => '2025-05-28 16:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-29', 'slot_day' => 'Thursday', 'slot_time' => '2025-05-29 10:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-29', 'slot_day' => 'Thursday', 'slot_time' => '2025-05-29 13:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-29', 'slot_day' => 'Thursday', 'slot_time' => '2025-05-29 16:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-30', 'slot_day' => 'Friday', 'slot_time' => '2025-05-30 10:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-30', 'slot_day' => 'Friday', 'slot_time' => '2025-05-30 13:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-05-30', 'slot_day' => 'Friday', 'slot_time' => '2025-05-30 16:00:00', 'total_order' => 20],
+
+    // Week 3
+    ['slot_date' => '2025-06-04', 'slot_day' => 'Wednesday', 'slot_time' => '2025-06-04 10:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-06-04', 'slot_day' => 'Wednesday', 'slot_time' => '2025-06-04 13:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-06-04', 'slot_day' => 'Wednesday', 'slot_time' => '2025-06-04 16:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-06-05', 'slot_day' => 'Thursday', 'slot_time' => '2025-06-05 10:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-06-05', 'slot_day' => 'Thursday', 'slot_time' => '2025-06-05 13:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-06-05', 'slot_day' => 'Thursday', 'slot_time' => '2025-06-05 16:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-06-06', 'slot_day' => 'Friday', 'slot_time' => '2025-06-06 10:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-06-06', 'slot_day' => 'Friday', 'slot_time' => '2025-06-06 13:00:00', 'total_order' => 20],
+    ['slot_date' => '2025-06-06', 'slot_day' => 'Friday', 'slot_time' => '2025-06-06 16:00:00', 'total_order' => 20]
 ];
 
 foreach ($collectionSlots as $slot) {
     $insert_sql = "INSERT INTO collection_slot (slot_date, slot_day, slot_time, total_order) 
                    VALUES (TO_DATE(:slot_date, 'YYYY-MM-DD'), :slot_day, 
-                   TO_DATE(:slot_time, 'HH24:MI:SS'), :total_order)";
+                   TO_TIMESTAMP(:slot_time, 'YYYY-MM-DD HH24:MI:SS'), :total_order)";
     $stmt = oci_parse($conn, $insert_sql);
     
     oci_bind_by_name($stmt, ":slot_date", $slot['slot_date']);

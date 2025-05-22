@@ -299,6 +299,8 @@ if (is_object($description) && method_exists($description, 'load')) {
    
    <!-- Toastify CSS -->
    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+   <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Footer.css">
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Header.css">
    
    <style>
        /* Additional shop-specific styles */
@@ -505,6 +507,8 @@ if (is_object($description) && method_exists($description, 'load')) {
        </div>
     </section>
 </div>
+
+
 
 <!-- Toastify JS -->
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>

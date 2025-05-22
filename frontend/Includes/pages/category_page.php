@@ -289,54 +289,13 @@ oci_close($conn);
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title><?php echo $display_category; ?> Products</title>
-   <link rel="stylesheet" href="../../assets/CSS/category_page.css">
+   
    
    <!-- Toastify CSS -->
    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-   
-   <style>
-   .sort-container {
-       max-width: 1200px;
-       margin: 0 auto 20px;
-       padding: 0 20px;
-   }
-   
-   .sort-form {
-       display: flex;
-       justify-content: flex-end;
-   }
-   
-   .sort-select {
-       padding: 8px 12px;
-       border: 1px solid #ddd;
-       border-radius: 4px;
-       background-color: white;
-       font-size: 14px;
-       cursor: pointer;
-       outline: none;
-   }
-   
-   .sort-select:hover {
-       border-color: #4CAF50;
-   }
-   
-   .rating {
-       display: flex;
-       align-items: center;
-       gap: 5px;
-       margin-top: 5px;
-       color: #666;
-   }
-   
-   .rating-stars {
-       color: #ffd700;
-   }
-   
-   .no-rating {
-       color: #999;
-       font-style: italic;
-   }
-   </style>
+   <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/category_page.css">
+   <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Footer.css">
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Header.css">
 </head>
 <body>
    <header>

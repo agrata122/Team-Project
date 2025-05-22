@@ -14,7 +14,7 @@ require_once 'C:\xampp\htdocs\E-commerce\backend\connect.php';
 $conn = getDBConnection();
 
 if (!$conn) {
-    die("❌ Failed to connect to Oracle database.");
+    die("Failed to connect to Oracle database.");
 }
 
 $user_id = $_SESSION['user_id'];

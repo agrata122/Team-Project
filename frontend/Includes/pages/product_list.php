@@ -252,6 +252,8 @@ oci_close($conn);
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title>View Products</title>
    <link rel="stylesheet" href="../../assets/CSS/product_list.css">
+   <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Footer.css">
+    <link rel="stylesheet" href="/E-commerce/frontend/assets/CSS/Header.css">
    
    <!-- Toastify CSS -->
    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
